@@ -176,32 +176,32 @@ if [ "$KVM_AVAILABLE" = true ] && [ "$KVM_DEVICE_AVAILABLE" = true ]; then
     echo "Using KVM acceleration for best performance..."
     QEMU_OPTS="-machine type=q35,accel=kvm -cpu host"
 else
-    echo "Using software emulation (slower but more compatible)..."
-    QEMU_OPTS="-machine type=q35 -cpu qemu64"
+    exit 1
 fi
 
 echo "Press Ctrl+A, then X to exit QEMU"
 echo
 
+
+
 # Start QEMU with autoinstall configuration
 qemu-system-x86_64 \
     -m 2048 \
     -smp 2 \
-    $QEMU_OPTS \
     -cdrom "$ISO_FILE" \
     -hda openbsd-vm.qcow2 \
     -boot d \
     -netdev user,id=mynet0 \
     -device e1000,netdev=mynet0 \
-    -display gtk \
-    -vga std \
-    -usb \
-    -device usb-tablet \
-    -rtc base=utc \
-    -serial mon:stdio \
-    -kernel bsd.rd \
-    -append "com0=/dev/ttyS0 console=com0 autoinstall=http://$HOST_IP:8686/install.conf" \
+    -vga virtio \
     -name "OpenBSD $OPENBSD_VERSION Autoinstall" &
+
+# -kernel bsd.rd \
+# -append "com0=/dev/ttyS0 console=com0 autoinstall=http://$HOST_IP:8686/install.conf" \
+
+
+
+    
 QEMU_PID=$!
 
 echo "QEMU started with PID: $QEMU_PID"
