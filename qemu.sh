@@ -9,6 +9,13 @@ echo "Starting Python web server on port 8686..."
 python3 -m http.server 8686 &
 WEB_SERVER_PID=$!
 
+# Wait for web server to start listening
+echo "Waiting for web server to start listening on port 8686..."
+while ! netstat -tuln | grep -q ":8686 "; do
+    sleep 0.1
+done
+echo "Web server is now listening on port 8686"
+
 # Function to cleanup on exit
 cleanup() {
     echo "Cleaning up..."
