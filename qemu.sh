@@ -29,7 +29,8 @@ cleanup() {
 trap cleanup EXIT
 
 OPENBSD_VERSION="7.7"
-ISO_FILE="install$OPENBSD_VERSION.iso"
+OPENBSD_PERIOD_STRIPPED=$(echo "$OPENBSD_VERSION" | tr -d '.')
+ISO_FILE="install$OPENBSD_PERIOD_STRIPPED.iso"
 
 ARCH=$(uname -m)
 if [ "$ARCH" != "x86_64" ]; then
