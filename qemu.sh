@@ -42,4 +42,12 @@ qemu-img create -f qcow2 openbsd-vm.qcow2 2G
 # The cleanup function will be called automatically when the script exits
 echo "Script completed. Web server will be stopped automatically."
 
-
+qemu-system-x86_64 \
+  -m 2048 \
+  -nographic \
+  -cdrom $ISO_FILE \
+  -hda openbsd-vm.qcow2 \
+  -boot d \
+  -netdev user,id=mynet0 -device e1000,netdev=mynet0 \
+  -kernel /7.7/amd64/bsd.rd \
+  -append "com0=/dev/ttyS0 console=com0 autoinstall=http://<host-ip>:8000/install.conf"
