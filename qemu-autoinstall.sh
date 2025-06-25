@@ -4,6 +4,7 @@ set -e
 OPENBSD_VERSION="7.7"
 OPENBSD_PERIOD_STRIPPED=$(echo "$OPENBSD_VERSION" | tr -d '.')
 ISO_FILE="install$OPENBSD_PERIOD_STRIPPED.iso"
+RAMDISK_FILE="bsd$OPENBSD_PERIOD_STRIPPED.rd"
 
 ARCH=$(uname -m)
 if [ "$ARCH" != "x86_64" ]; then
@@ -79,16 +80,16 @@ get_host_ip() {
 
 # Start Python web server for autoinstall
 start_web_server() {
-    echo "Starting Python web server on port 8686..."
-    python3 -m http.server 8686 &
+    echo "Starting Python web server on port 8687..."
+    python3 -m http.server 8687 &
     WEB_SERVER_PID=$!
     
     # Wait for web server to start listening
-    echo "Waiting for web server to start listening on port 8686..."
-    while ! netstat -tuln | grep -q ":8686 "; do
+    echo "Waiting for web server to start listening on port 8687..."
+    while ! netstat -tuln | grep -q ":8687 "; do
         sleep 0.1
     done
-    echo "Web server is now listening on port 8686"
+    echo "Web server is now listening on port 8687"
 }
 
 # Download OpenBSD ISO if it doesn't exist
@@ -116,7 +117,7 @@ create_disk() {
 extract_kernel() {
     echo "Extracting kernel from ISO..."
     if command -v isoinfo >/dev/null 2>&1; then
-        isoinfo -i "$ISO_FILE" -R -x "/$OPENBSD_VERSION/amd64/bsd.rd" > bsd.rd
+        isoinfo -i "$ISO_FILE" -R -x "/$OPENBSD_VERSION/amd64/bsd.rd" | gunzip > "$RAMDISK_FILE"
     else
         echo "Warning: isoinfo not found, skipping kernel extraction"
         echo "You may need to install genisoimage or cdrtools"
@@ -166,7 +167,7 @@ create_disk
 extract_kernel
 
 # Start web server for autoinstall
-start_web_server
+# start_web_server
 
 echo
 echo "Starting QEMU with OpenBSD $OPENBSD_VERSION autoinstall..."
@@ -174,18 +175,18 @@ echo "Starting QEMU with OpenBSD $OPENBSD_VERSION autoinstall..."
 # Determine best QEMU configuration based on KVM availability
 if [ "$KVM_AVAILABLE" = true ] && [ "$KVM_DEVICE_AVAILABLE" = true ]; then
     echo "Using KVM acceleration for best performance..."
-    QEMU_OPTS="-machine type=q35,accel=kvm -cpu host"
+    QEMU_OPTS="-machine type=pc,accel=kvm -cpu host"
 else
-    exit 1
+    echo "KVM not available, using TCG emulation (slower but will work)..."
+    QEMU_OPTS="-machine type=pc,accel=tcg -cpu qemu64"
 fi
 
 echo "Press Ctrl+A, then X to exit QEMU"
 echo
 
-
-
 # Start QEMU with autoinstall configuration
 qemu-system-x86_64 \
+    $QEMU_OPTS \
     -m 2048 \
     -smp 2 \
     -cdrom "$ISO_FILE" \
@@ -193,15 +194,11 @@ qemu-system-x86_64 \
     -boot d \
     -netdev user,id=mynet0 \
     -device e1000,netdev=mynet0 \
-    -vga virtio \
+    -nographic \
+    -kernel $OPENBSD_PERIOD_STRIPPED \
+    -append "com0" \
     -name "OpenBSD $OPENBSD_VERSION Autoinstall" &
 
-# -kernel bsd.rd \
-# -append "com0=/dev/ttyS0 console=com0 autoinstall=http://$HOST_IP:8686/install.conf" \
-
-
-
-    
 QEMU_PID=$!
 
 echo "QEMU started with PID: $QEMU_PID"
