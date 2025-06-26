@@ -69,7 +69,7 @@ expect "boot>"
 send "boot\r"
 expect -timeout 60 "(I)nstall, (U)pgrade, (A)utoinstall or (S)hell?"
 send "A\r"
-expect "Response file location? [http://10.0.2.2/install.conf]"
+expect "Response file location?"
 send "http://10.0.2.2:8686/install.conf\r"
 expect -timeout -1 "never"
 EOF
