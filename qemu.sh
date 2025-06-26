@@ -71,7 +71,7 @@ expect -timeout 60 "(I)nstall, (U)pgrade, (A)utoinstall or (S)hell?"
 send "A\r"
 expect "Response file location?"
 send "http://10.0.2.2:8686/install.conf\r"
-expect -timeout 300 "login: "
+expect -timeout 600 "login: "
 interact
 EOF
 
