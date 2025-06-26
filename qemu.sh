@@ -60,9 +60,6 @@ qemu-system-x86_64 \
   -cdrom $ISO_FILE \
   -hda openbsd-vm.qcow2 \
   -boot d \
-  -netdev user,id=mynet0,hostfwd=tcp::8686-:8686 -device e1000,netdev=mynet0 \
-  -kernel bsd.rd \
-  -append "com0=/dev/ttyS0 console=com0 autoinstall=http://$HOST_IP:8686/install.conf"
 
 # The cleanup function will be called automatically when the script exits
 echo "Script completed. Web server will be stopped automatically."
