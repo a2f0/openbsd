@@ -52,7 +52,7 @@ if {![file exists $ISO_FILE]} {
 }
 
 # Create and format the disk partition
-exec qemu-img create -f qcow2 openbsd-vm.qcow2 2G
+exec qemu-img create -f qcow2 openbsd-vm.qcow2 5G
 
 exec isoinfo -i $ISO_FILE -R -x /$OPENBSD_VERSION/amd64/bsd.rd > bsd.rd
 
