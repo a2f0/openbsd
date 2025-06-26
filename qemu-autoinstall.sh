@@ -172,21 +172,12 @@ extract_kernel
 echo
 echo "Starting QEMU with OpenBSD $OPENBSD_VERSION autoinstall..."
 
-# Determine best QEMU configuration based on KVM availability
-if [ "$KVM_AVAILABLE" = true ] && [ "$KVM_DEVICE_AVAILABLE" = true ]; then
-    echo "Using KVM acceleration for best performance..."
-    QEMU_OPTS="-machine type=pc,accel=kvm -cpu host"
-else
-    echo "KVM not available, using TCG emulation (slower but will work)..."
-    QEMU_OPTS="-machine type=pc,accel=tcg -cpu qemu64"
-fi
 
 echo "Press Ctrl+A, then X to exit QEMU"
 echo
 
 # Start QEMU with autoinstall configuration
 qemu-system-x86_64 \
-    $QEMU_OPTS \
     -m 2048 \
     -smp 2 \
     -cdrom "$ISO_FILE" \
