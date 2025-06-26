@@ -1,65 +1,68 @@
-#!/bin/sh
-set -e
+#!/usr/bin/expect -f
 
 # Get host IP for QEMU networking
-HOST_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
+set HOST_IP [exec ip route get 1.1.1.1 | awk {{print $7; exit}}]
 
 # Start Python web server in background
-echo "Starting Python web server on port 8686..."
-python3 -m http.server 8686 &
-WEB_SERVER_PID=$!
+puts "Starting Python web server on port 8686..."
+exec python3 -m http.server 8686 &
+set WEB_SERVER_PID [exec pgrep -f "python3 -m http.server 8686"]
 
 # Wait for web server to start listening
-echo "Waiting for web server to start listening on port 8686..."
-while ! netstat -tuln | grep -q ":8686 "; do
+puts "Waiting for web server to start listening on port 8686..."
+while {1} {
+    set result [catch {exec netstat -tuln | grep ":8686 "} output]
+    if {$result == 0 && $output != ""} {
+        break
+    }
     sleep 0.1
-done
-echo "Web server is now listening on port 8686"
+}
+puts "Web server is now listening on port 8686"
 
 # Function to cleanup on exit
-cleanup() {
-    echo "Cleaning up..."
-    if [ ! -z "$WEB_SERVER_PID" ]; then
-        echo "Stopping Python web server (PID: $WEB_SERVER_PID)..."
-        kill $WEB_SERVER_PID 2>/dev/null || true
-    fi
+proc cleanup {} {
+    global WEB_SERVER_PID
+    puts "Cleaning up..."
+    if {$WEB_SERVER_PID != ""} {
+        puts "Stopping Python web server (PID: $WEB_SERVER_PID)..."
+        catch {exec kill $WEB_SERVER_PID}
+    }
 }
 
-# Set trap to cleanup on script exit
-trap cleanup EXIT
+# Note: Cleanup will be handled manually when the script exits
 
-OPENBSD_VERSION="7.7"
-OPENBSD_PERIOD_STRIPPED=$(echo "$OPENBSD_VERSION" | tr -d '.')
-ISO_FILE="install$OPENBSD_PERIOD_STRIPPED.iso"
+set OPENBSD_VERSION "7.7"
+set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
+set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
 
-ARCH=$(uname -m)
-if [ "$ARCH" != "x86_64" ]; then
-    echo "Error: This script requires x86_64 architecture. Current architecture: $ARCH"
+# Check architecture
+set ARCH [exec uname -m]
+if {$ARCH != "x86_64"} {
+    puts "Error: This script requires x86_64 architecture. Current architecture: $ARCH"
     exit 1
-fi
+}
 
 # Download OpenBSD ISO if it doesn't exist
-if [ ! -f "$ISO_FILE" ]; then
-    echo "Downloading OpenBSD $OPENBSD_VERSION ISO..."
-    wget -O "$ISO_FILE" "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/$ISO_FILE"
-    echo "Download completed: $ISO_FILE"
-else
-    echo "ISO file already exists: $ISO_FILE"
-fi
+if {![file exists $ISO_FILE]} {
+    puts "Downloading OpenBSD $OPENBSD_VERSION ISO..."
+    exec wget -O $ISO_FILE "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/$ISO_FILE"
+    puts "Download completed: $ISO_FILE"
+} else {
+    puts "ISO file already exists: $ISO_FILE"
+}
 
-# create and format the disk partition
-qemu-img create -f qcow2 openbsd-vm.qcow2 2G
+# Create and format the disk partition
+exec qemu-img create -f qcow2 openbsd-vm.qcow2 2G
 
-isoinfo -i $ISO_FILE -R -x /$OPENBSD_VERSION/amd64/bsd.rd > bsd.rd
+exec isoinfo -i $ISO_FILE -R -x /$OPENBSD_VERSION/amd64/bsd.rd > bsd.rd
 
-echo "Starting QEMU with network access to host IP: $HOST_IP"
+puts "Starting QEMU with network access to host IP: $HOST_IP"
 
-export ISO_FILE
-expect << 'EOF'
 spawn qemu-system-x86_64 \
   -m 4096 \
+  -smp cpus=2 \
   -nographic \
-  -cdrom $env(ISO_FILE) \
+  -cdrom $ISO_FILE \
   -hda openbsd-vm.qcow2 \
   -boot c
 
@@ -73,7 +76,5 @@ expect "Response file location?"
 send "http://10.0.2.2:8686/install.conf\r"
 expect -timeout 600 "login: "
 interact
-EOF
 
-# The cleanup function will be called automatically when the script exits
-echo "Script completed. Web server will be stopped automatically."
+cleanup
