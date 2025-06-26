@@ -59,7 +59,10 @@ qemu-system-x86_64 \
   -nographic \
   -cdrom $ISO_FILE \
   -hda openbsd-vm.qcow2 \
-  -boot d \
+  -boot c \
+
+  # set tty com0
+  # boot
 
 # The cleanup function will be called automatically when the script exits
 echo "Script completed. Web server will be stopped automatically."
