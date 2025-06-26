@@ -54,15 +54,21 @@ isoinfo -i $ISO_FILE -R -x /$OPENBSD_VERSION/amd64/bsd.rd > bsd.rd
 
 echo "Starting QEMU with network access to host IP: $HOST_IP"
 
-qemu-system-x86_64 \
+export ISO_FILE
+expect << 'EOF'
+spawn qemu-system-x86_64 \
   -m 2048 \
   -nographic \
-  -cdrom $ISO_FILE \
+  -cdrom $env(ISO_FILE) \
   -hda openbsd-vm.qcow2 \
-  -boot c \
+  -boot c
 
-  # set tty com0
-  # boot
+expect "boot>"
+send "set tty com0\r"
+expect "boot>"
+send "boot\r"
+interact
+EOF
 
 # The cleanup function will be called automatically when the script exits
 echo "Script completed. Web server will be stopped automatically."
