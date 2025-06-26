@@ -195,7 +195,7 @@ qemu-system-x86_64 \
     -netdev user,id=mynet0 \
     -device e1000,netdev=mynet0 \
     -nographic \
-    -kernel $OPENBSD_PERIOD_STRIPPED \
+    -kernel $RAMDISK_FILE \
     -append "com0" \
     -name "OpenBSD $OPENBSD_VERSION Autoinstall" &
 
