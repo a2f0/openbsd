@@ -57,7 +57,7 @@ echo "Starting QEMU with network access to host IP: $HOST_IP"
 export ISO_FILE
 expect << 'EOF'
 spawn qemu-system-x86_64 \
-  -m 2048 \
+  -m 4096 \
   -nographic \
   -cdrom $env(ISO_FILE) \
   -hda openbsd-vm.qcow2 \
@@ -71,7 +71,8 @@ expect -timeout 60 "(I)nstall, (U)pgrade, (A)utoinstall or (S)hell?"
 send "A\r"
 expect "Response file location?"
 send "http://10.0.2.2:8686/install.conf\r"
-expect -timeout -1 "never"
+expect -timeout 300 "login: "
+interact
 EOF
 
 # The cleanup function will be called automatically when the script exits
