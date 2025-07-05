@@ -26,6 +26,21 @@ proc cleanup {} {
     }
 }
 
+# Function to download file with error handling
+proc download_file {url filename} {
+    puts "Attempting to download $filename from $url"
+    
+    # Try wget
+    set wget_result [catch {exec wget -q -O $filename $url} wget_output]
+    if {$wget_result == 0} {
+        puts "Download completed successfully using wget"
+        return 1
+    }
+    
+    puts "wget failed: $wget_output"
+    puts "Please install wget or download manually."
+    return 0
+}
 
 set OPENBSD_VERSION "7.7"
 set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
@@ -38,13 +53,21 @@ if {$ARCH != "x86_64"} {
 }
 
 if {![file exists $ISO_FILE]} {
-    puts "Downloading OpenBSD $OPENBSD_VERSION ISO..."
-    exec wget -O $ISO_FILE "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/$ISO_FILE"
-    puts "Download completed: $ISO_FILE"
+    puts "ISO file not found: $ISO_FILE"
+    set download_url "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/$ISO_FILE"
+    
+    if {[download_file $download_url $ISO_FILE]} {
+        puts "Download completed: $ISO_FILE"
+    } else {
+        puts "Failed to download ISO file."
+        cleanup
+        exit 1
+    }
 } else {
     puts "ISO file already exists: $ISO_FILE"
 }
 
+puts "Creating virtual disk image..."
 exec qemu-img create -f qcow2 openbsd-vm.qcow2 5G
 
 puts "Starting QEMU with network access to host IP: $HOST_IP"
