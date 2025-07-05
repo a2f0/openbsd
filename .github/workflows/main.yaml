@@ -13,6 +13,9 @@ jobs:
       - name: List directory contents
         run: ls -l
 
+      - name: Install expect
+        run: sudo apt-get install -y expect
+
       - name: Run QEMU OpenBSD installation
         run: ./qemu.exp
         timeout-minutes: 30
