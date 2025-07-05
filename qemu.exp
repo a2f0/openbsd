@@ -89,6 +89,24 @@ send "A\r"
 expect "Response file location?"
 send "http://10.0.2.2:8686/install.conf\r"
 expect -timeout 600 "login: "
-interact
 
-cleanup
+# Enter the qemu menu by pressing cntrl+a, then c
+# cntrl + a
+send "\x01" 
+sleep 0.1
+send "c"
+
+expect "(qemu)"
+
+# qemu command to shut down the vm
+send "system_powerdown\r"
+
+# Wait for the VM to shut down completely
+# expect -timeout 60 "qemu-system-x86_64: terminating on signal"
+
+puts "Waiting for vm to stop..."
+
+# Wait for the spawn process to finish
+wait
+
+puts "\rFinished"

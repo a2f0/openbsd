@@ -21,5 +21,5 @@ spawn qemu-system-x86_64 \
 # Wait for the VM to boot and show login prompt
 expect -timeout 300 "login: "
 
-# Pass control to user for interaction
-interact 
+interact
+
