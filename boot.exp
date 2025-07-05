@@ -1,0 +1,26 @@
+#!/usr/bin/expect -f
+
+puts "Starting OpenBSD VM..."
+
+# Check if the VM disk image exists
+if {![file exists "openbsd-vm.qcow2"]} {
+    puts "Error: openbsd-vm.qcow2 not found. Please run the installation script first."
+    exit 1
+}
+
+puts "Booting OpenBSD VM..."
+
+spawn qemu-system-x86_64 \
+    -m 4096 \
+    -smp cpus=2 \
+    -nographic \
+    -serial mon:stdio \
+    -hda openbsd-vm.qcow2 \
+    -boot c
+
+# Wait for the VM to boot and show login prompt
+expect -timeout 300 "login: "
+puts "OpenBSD VM is ready for login"
+
+# Pass control to user for interaction
+interact 
