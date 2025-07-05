@@ -10,8 +10,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install expect
-        run: sudo apt-get install -y expect qemu-system
+      - name: Install expect and qemu
+        run: sudo apt-get install -y expect qemu-system-x86
 
       - name: Run QEMU OpenBSD installation
         run: ./qemu.exp
