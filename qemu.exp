@@ -45,11 +45,27 @@ proc download_file {url filename} {
 set OPENBSD_VERSION "7.7"
 set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
 set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
+set SHA256_FILE "SHA256"
 
 set ARCH [exec uname -m]
 if {$ARCH != "x86_64"} {
     puts "Error: This script requires x86_64 architecture. Current architecture: $ARCH"
     exit 1
+}
+
+if {![file exists $SHA256_FILE]} {
+    puts "ISO file not found: $SHA256_FILE"
+    set download_url "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/SHA256"
+    
+    if {[download_file $download_url $SHA256_FILE]} {
+        puts "Download completed: $SHA256_FILE"
+    } else {
+        puts "Failed to download SHA256 file."
+        cleanup
+        exit 1
+    }
+} else {
+    puts "SHA256 file already exists: $SHA256_FILE"
 }
 
 if {![file exists $ISO_FILE]} {
@@ -66,6 +82,16 @@ if {![file exists $ISO_FILE]} {
 } else {
     puts "ISO file already exists: $ISO_FILE"
 }
+
+# Verify SHA256 checksums
+puts "Verifying SHA256 checksums..."
+set sha256_result [catch {exec sha256sum -c SHA256 --ignore-missing} sha256_output]
+if {$sha256_result != 0} {
+    puts "Error: SHA256 verification failed: $sha256_output"
+    cleanup
+    exit 1
+}
+puts "SHA256 verification completed successfully"
 
 puts "Creating virtual disk image..."
 exec qemu-img create -f qcow2 openbsd-vm.qcow2 5G
