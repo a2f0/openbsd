@@ -20,7 +20,6 @@ spawn qemu-system-x86_64 \
 
 # Wait for the VM to boot and show login prompt
 expect -timeout 300 "login: "
-puts "OpenBSD VM is ready for login"
 
 # Pass control to user for interaction
 interact 
