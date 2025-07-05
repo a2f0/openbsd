@@ -4,5 +4,5 @@
 
 ### QEMU
 
-1. Run `./qemu.sh` to provision the vm.
+1. Run `./qemu.exp` to provision the vm.
 2. Run `./boot` to use it.
