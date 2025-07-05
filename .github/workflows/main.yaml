@@ -10,6 +10,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: List directory contents
+        run: ls -l
+
       - name: Run QEMU OpenBSD installation
         run: ./qemu.exp
         timeout-minutes: 30
