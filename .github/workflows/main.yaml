@@ -16,3 +16,6 @@ jobs:
       - name: Run QEMU OpenBSD installation
         run: ./qemu.exp
         timeout-minutes: 30
+        env:
+          USER_PASSWORD: CICD
+          ROOT_PASSWORD: CICD

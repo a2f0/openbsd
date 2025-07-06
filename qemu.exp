@@ -3,6 +3,36 @@
 # Get host IP for QEMU networking
 set HOST_IP [exec ip route get 1.1.1.1 | awk {{print $7; exit}}]
 
+# Function to generate install.conf with environment variable interpolation
+proc generate_install_conf {} {
+    set user_password [exec env | grep -E "^USER_PASSWORD=" | cut -d= -f2-]
+    set root_password [exec env | grep -E "^ROOT_PASSWORD=" | cut -d= -f2-]
+    # Generate install.conf
+    set conf_content "System hostname = openbsd-vm
+Password for root = $root_password
+Do you expect to run the X Window System = no
+Change the default console to com0 = yes
+Which speed should com0 use = 19200
+Setup a user = a2f0
+Password for user = $user_password
+Public ssh key for user = ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDNc4EolzqwqciuPM12WtwA/tC0GjUL6q6XZyEr/VJC0TEACwP6syaqLPET1JxDx7Bsb93uQM7YT9gkn8iAZzw6nAelcixA2lw3b5TUGjyb10zDgGmtZb2r6ksbBokdWdRQzTg2Io+aNv5z27V0lmoEzqN/ePX74GY4oPUWt3CfNqAquS5Ig7YolX0F3BfcjXyFmZ9xWK0BxHP+s/37+GK3S1vb3WjLUV+OEX4E4g4nn/P2iuMUkon+GEQj5kajX97hQ2P5PDGztUPgu2nIeQMMOV3ktetgBc1qWflYEM/1WwKeC0bFvwtNiDmDAipJfJU4NQJ2DI31pOfbOydnkJyl dansullivan@gmail.com
+What timezone are you in = UTC
+Location of sets = cd0
+HTTP Server = cdn.openbsd.org
+Disk to use = sd0
+Partitioning = auto
+# Directory does not contain SHA256.sig. Continue without verification?
+Continue without verification? = yes
+Set name(s) = -game* -x* -comp*"
+    
+    # Write the content to install.conf
+    set file [open "install.conf" w]
+    puts $file $conf_content
+    close $file
+    
+    puts "Generated install.conf with interpolated passwords"
+}
+
 puts "Starting Python web server on port 8686..."
 exec python3 -m http.server 8686 &
 set WEB_SERVER_PID [exec pgrep -f "python3 -m http.server 8686"]
@@ -108,6 +138,8 @@ if {[file exists $DISK_FILE]} {
     cleanup
     exit 1
 }
+
+generate_install_conf
 
 puts "Creating virtual disk image..."
 exec qemu-img create -f qcow2 $DISK_FILE 5G
