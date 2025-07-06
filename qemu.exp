@@ -142,4 +142,7 @@ puts "Waiting for vm to stop..."
 # Wait for the spawn process to finish
 wait
 
+# Terminate the web server
+cleanup
+
 puts "\rFinished"
