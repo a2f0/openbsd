@@ -26,6 +26,15 @@ proc cleanup {} {
     }
 }
 
+# Set up trap to always run cleanup on exit
+proc exit_handler {} {
+    cleanup
+    exit
+}
+
+# Register the exit handler
+exit -onexit exit_handler
+
 # Function to download file with error handling
 proc download_file {url filename} {
     puts "Attempting to download $filename from $url"
@@ -142,7 +151,5 @@ puts "Waiting for vm to stop..."
 # Wait for the spawn process to finish
 wait
 
-# Terminate the web server
-cleanup
 
 puts "\rFinished"
