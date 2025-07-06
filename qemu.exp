@@ -46,6 +46,7 @@ set OPENBSD_VERSION "7.7"
 set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
 set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
 set SHA256_FILE "SHA256"
+set DISK_FILE "openbsd-vm.qcow2"
 
 set ARCH [exec uname -m]
 if {$ARCH != "x86_64"} {
@@ -93,14 +94,14 @@ if {$sha256_result != 0} {
 }
 puts "SHA256 verification completed successfully"
 
-if {[file exists "openbsd-vm.qcow2"]} {
-    puts "Error: Virtual disk 'openbsd-vm.qcow2' already exists."
+if {[file exists $DISK_FILE]} {
+    puts "Error: Virtual disk '$DISK_FILE' already exists."
     cleanup
     exit 1
 }
 
 puts "Creating virtual disk image..."
-exec qemu-img create -f qcow2 openbsd-vm.qcow2 5G
+exec qemu-img create -f qcow2 $DISK_FILE 5G
 
 puts "Starting QEMU with network access to host IP: $HOST_IP"
 
@@ -109,7 +110,7 @@ spawn qemu-system-x86_64 \
   -smp cpus=2 \
   -nographic \
   -cdrom $ISO_FILE \
-  -hda openbsd-vm.qcow2 \
+  -hda $DISK_FILE \
   -boot c
 
 expect "boot>"
