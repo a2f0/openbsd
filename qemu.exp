@@ -93,6 +93,12 @@ if {$sha256_result != 0} {
 }
 puts "SHA256 verification completed successfully"
 
+if {[file exists "openbsd-vm.qcow2"]} {
+    puts "Error: Virtual disk 'openbsd-vm.qcow2' already exists."
+    cleanup
+    exit 1
+}
+
 puts "Creating virtual disk image..."
 exec qemu-img create -f qcow2 openbsd-vm.qcow2 5G
 
