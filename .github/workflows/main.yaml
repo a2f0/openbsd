@@ -15,15 +15,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y expect qemu-system-x86
 
+      - name: Generate throwaway ssh key
+        id: ssh-key
+        run: |
+          ssh-keygen -q -t ed25519 -N "" -C ci -f "$RUNNER_TEMP/ci_ssh_key"
+          echo "public-key=$(cat "$RUNNER_TEMP/ci_ssh_key.pub")" >> "$GITHUB_OUTPUT"
+
       - name: Run QEMU OpenBSD installation
         run: ./qemu.exp
         timeout-minutes: 30
         env:
           USER_PASSWORD: CICD
           ROOT_PASSWORD: CICD
+          SSH_PUBLIC_KEY: ${{ steps.ssh-key.outputs.public-key }}
 
-      - name: Boot installed VM and check login and ssh
+      - name: Boot installed VM and check console and ssh logins
         run: ./boot.exp --check
         timeout-minutes: 10
         env:
           USER_PASSWORD: CICD
+          SSH_IDENTITY_FILE: ${{ runner.temp }}/ci_ssh_key

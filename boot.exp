@@ -1,7 +1,7 @@
 #!/usr/bin/expect -f
 
 # Usage: ./boot.exp          boot the VM and attach to its console
-#        ./boot.exp --check  boot the VM, verify console login and ssh, then
+#        ./boot.exp --check  boot the VM, verify console and ssh logins, then
 #                            power it off (requires USER_PASSWORD)
 
 if {$argc == 0} {
@@ -59,13 +59,19 @@ if {$CHECK} {
     send "uname -sr\r"
     expect -re {OpenBSD [0-9]+\.[0-9]+}
 
-    # Confirm sshd answers through the port forward
-    if {[catch {exec -ignorestderr ssh-keyscan -T 10 -p 2222 127.0.0.1} keys]
-            || ![string match "*ssh-ed25519*" $keys]} {
-        puts "\nError: sshd not reachable on port 2222"
+    # Log in over ssh with the user's installed key. SSH_IDENTITY_FILE picks
+    # the private key (CI uses a throwaway one), otherwise ssh's defaults apply.
+    set ssh_cmd [list ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR]
+    if {[info exists env(SSH_IDENTITY_FILE)] && $env(SSH_IDENTITY_FILE) ne ""} {
+        lappend ssh_cmd -i $env(SSH_IDENTITY_FILE) -o IdentitiesOnly=yes
+    }
+    lappend ssh_cmd a2f0@127.0.0.1 uname -sr
+    if {[catch {exec {*}$ssh_cmd 2>@1} ssh_out] || ![string match "OpenBSD *" $ssh_out]} {
+        puts "\nError: ssh login as a2f0 failed: $ssh_out"
         exit 1
     }
-    puts "\nsshd is reachable on port 2222"
+    puts "\nssh login as a2f0 succeeded: $ssh_out"
 
     # Enter the qemu monitor (cntrl+a, then c) and shut down the vm
     send "\x01"
