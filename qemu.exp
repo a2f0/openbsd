@@ -56,14 +56,9 @@ proc cleanup {} {
     }
 }
 
-# Set up trap to always run cleanup on exit
-proc exit_handler {} {
-    cleanup
-    exit
-}
-
-# Register the exit handler
-exit -onexit exit_handler
+# Always run cleanup on exit. The handler must not call exit itself, or the
+# script's exit status is replaced with 0.
+exit -onexit cleanup
 
 # Function to download file with error handling
 proc download_file {url filename} {
@@ -153,6 +148,12 @@ spawn qemu-system-x86_64 \
   -cdrom $ISO_FILE \
   -hda $DISK_FILE \
   -boot c
+
+# Fail if any expect below times out or QEMU exits, instead of carrying on
+expect_after {
+    timeout { puts "\nError: timed out waiting for VM output"; exit 1 }
+    eof     { puts "\nError: QEMU exited unexpectedly"; exit 1 }
+}
 
 expect "boot>"
 send "set tty com0\r"
