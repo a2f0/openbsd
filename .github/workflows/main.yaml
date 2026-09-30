@@ -21,3 +21,9 @@ jobs:
         env:
           USER_PASSWORD: CICD
           ROOT_PASSWORD: CICD
+
+      - name: Boot installed VM and check login and ssh
+        run: ./boot.exp --check
+        timeout-minutes: 10
+        env:
+          USER_PASSWORD: CICD

@@ -1,5 +1,23 @@
 #!/usr/bin/expect -f
 
+# Usage: ./boot.exp          boot the VM and attach to its console
+#        ./boot.exp --check  boot the VM, verify console login and ssh, then
+#                            power it off (requires USER_PASSWORD)
+
+if {$argc == 0} {
+    set CHECK 0
+} elseif {$argc == 1 && [lindex $argv 0] eq "--check"} {
+    set CHECK 1
+} else {
+    puts "Usage: $argv0 \[--check\]"
+    exit 1
+}
+
+if {$CHECK && ![info exists env(USER_PASSWORD)]} {
+    puts "Error: USER_PASSWORD must be set for --check."
+    exit 1
+}
+
 puts "Starting OpenBSD VM with SSH access..."
 
 # Check if the VM disk image exists
@@ -20,8 +38,46 @@ spawn qemu-system-x86_64 \
     -net user,hostfwd=tcp::2222-:22 \
     -boot c
 
+# Fail if any expect below times out or QEMU exits, instead of carrying on
+expect_after {
+    timeout { puts "\nError: timed out waiting for VM output"; exit 1 }
+    eof     { puts "\nError: QEMU exited unexpectedly"; exit 1 }
+}
+
 # Wait for the VM to boot and show login prompt
 expect -timeout 300 "login: "
+
+if {$CHECK} {
+    # Log in on the console and wait for a shell prompt
+    send "a2f0\r"
+    expect "Password:"
+    send -- "$env(USER_PASSWORD)\r"
+    expect {
+        "Login incorrect" { puts "\nError: console login failed"; exit 1 }
+        -re {\$ $} {}
+    }
+    send "uname -sr\r"
+    expect -re {OpenBSD [0-9]+\.[0-9]+}
+
+    # Confirm sshd answers through the port forward
+    if {[catch {exec -ignorestderr ssh-keyscan -T 10 -p 2222 127.0.0.1} keys]
+            || ![string match "*ssh-ed25519*" $keys]} {
+        puts "\nError: sshd not reachable on port 2222"
+        exit 1
+    }
+    puts "\nsshd is reachable on port 2222"
+
+    # Enter the qemu monitor (cntrl+a, then c) and shut down the vm
+    send "\x01"
+    sleep 0.1
+    send "c"
+    expect "(qemu)"
+    send "system_powerdown\r"
+    expect -timeout 120 eof
+
+    puts "\nCheck passed"
+    exit 0
+}
 
 interact
 
