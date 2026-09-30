@@ -81,7 +81,7 @@ proc download_file {url filename} {
     return 0
 }
 
-set OPENBSD_VERSION "7.8"
+set OPENBSD_VERSION "7.9"
 set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
 set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
 set SHA256_FILE "SHA256"
