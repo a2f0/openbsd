@@ -7,6 +7,11 @@ set HOST_IP [exec ip route get 1.1.1.1 | awk {{print $7; exit}}]
 proc generate_install_conf {} {
     set user_password [exec env | grep -E "^USER_PASSWORD=" | cut -d= -f2-]
     set root_password [exec env | grep -E "^ROOT_PASSWORD=" | cut -d= -f2-]
+    # SSH_PUBLIC_KEY replaces the default key for the user (CI passes a throwaway key)
+    set ssh_public_key "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDNc4EolzqwqciuPM12WtwA/tC0GjUL6q6XZyEr/VJC0TEACwP6syaqLPET1JxDx7Bsb93uQM7YT9gkn8iAZzw6nAelcixA2lw3b5TUGjyb10zDgGmtZb2r6ksbBokdWdRQzTg2Io+aNv5z27V0lmoEzqN/ePX74GY4oPUWt3CfNqAquS5Ig7YolX0F3BfcjXyFmZ9xWK0BxHP+s/37+GK3S1vb3WjLUV+OEX4E4g4nn/P2iuMUkon+GEQj5kajX97hQ2P5PDGztUPgu2nIeQMMOV3ktetgBc1qWflYEM/1WwKeC0bFvwtNiDmDAipJfJU4NQJ2DI31pOfbOydnkJyl dansullivan@gmail.com"
+    if {[info exists ::env(SSH_PUBLIC_KEY)] && $::env(SSH_PUBLIC_KEY) ne ""} {
+        set ssh_public_key $::env(SSH_PUBLIC_KEY)
+    }
     # Generate install.conf
     set conf_content "System hostname = openbsd-vm
 Password for root = $root_password
@@ -15,7 +20,7 @@ Change the default console to com0 = yes
 Which speed should com0 use = 19200
 Setup a user = a2f0
 Password for user = $user_password
-Public ssh key for user = ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDNc4EolzqwqciuPM12WtwA/tC0GjUL6q6XZyEr/VJC0TEACwP6syaqLPET1JxDx7Bsb93uQM7YT9gkn8iAZzw6nAelcixA2lw3b5TUGjyb10zDgGmtZb2r6ksbBokdWdRQzTg2Io+aNv5z27V0lmoEzqN/ePX74GY4oPUWt3CfNqAquS5Ig7YolX0F3BfcjXyFmZ9xWK0BxHP+s/37+GK3S1vb3WjLUV+OEX4E4g4nn/P2iuMUkon+GEQj5kajX97hQ2P5PDGztUPgu2nIeQMMOV3ktetgBc1qWflYEM/1WwKeC0bFvwtNiDmDAipJfJU4NQJ2DI31pOfbOydnkJyl dansullivan@gmail.com
+Public ssh key for user = $ssh_public_key
 What timezone are you in = UTC
 Location of sets = cd0
 HTTP Server = cdn.openbsd.org
@@ -56,14 +61,9 @@ proc cleanup {} {
     }
 }
 
-# Set up trap to always run cleanup on exit
-proc exit_handler {} {
-    cleanup
-    exit
-}
-
-# Register the exit handler
-exit -onexit exit_handler
+# Always run cleanup on exit. The handler must not call exit itself, or the
+# script's exit status is replaced with 0.
+exit -onexit cleanup
 
 # Function to download file with error handling
 proc download_file {url filename} {
@@ -153,6 +153,12 @@ spawn qemu-system-x86_64 \
   -cdrom $ISO_FILE \
   -hda $DISK_FILE \
   -boot c
+
+# Fail if any expect below times out or QEMU exits, instead of carrying on
+expect_after {
+    timeout { puts "\nError: timed out waiting for VM output"; exit 1 }
+    eof     { puts "\nError: QEMU exited unexpectedly"; exit 1 }
+}
 
 expect "boot>"
 send "set tty com0\r"
