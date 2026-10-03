@@ -1,1 +1,3 @@
+# Controller Python for lint tooling and qemu.exp's installer HTTP server.
+# Native OpenBSD hardening has no Python dependency.
 3.14.8
