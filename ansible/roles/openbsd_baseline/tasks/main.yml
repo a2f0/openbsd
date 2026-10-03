@@ -11,6 +11,35 @@
       - "'sshd' not in openbsd_baseline_disabled_services"
     fail_msg: Use a non-root SSH key login with working privilege escalation.
 
+- name: Preserve the configured SSH options for the key login probe
+  ansible.builtin.set_fact:
+    openbsd_baseline_original_ssh_args: >-
+      {{ lookup('ansible.builtin.config', 'ssh_args',
+                plugin_type='connection', plugin_name='ssh') }}
+
+# CLI passwords are stored outside host variables. Prove that the key works
+# over a separate connection before disabling any existing login method.
+# Put these options first: OpenSSH uses the first value, and ControlPath=none
+# prevents an existing password-authenticated master from satisfying the probe.
+- name: Require an independent SSH key login before changing authentication
+  vars:
+    ansible_ssh_args: >-
+      -o BatchMode=yes -o PreferredAuthentications=publickey
+      -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no
+      -o ControlPath=none {{ openbsd_baseline_original_ssh_args }}
+  block:
+    - name: Require key probe options to precede user SSH overrides
+      ansible.builtin.assert:
+        that: >-
+          ansible_ssh_args.startswith('-o BatchMode=yes -o PreferredAuthentications=publickey '
+          '-o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ControlPath=none ')
+        fail_msg: Remove ansible_ssh_args extra-vars overrides so the key login probe can run safely.
+
+    - name: Verify independent SSH key authentication
+      ansible.builtin.ping:
+      become: false
+      check_mode: false
+
 - name: Require every configured sysctl to exist
   ansible.builtin.command:
     argv:

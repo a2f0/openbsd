@@ -70,6 +70,8 @@ The target Python defaults to `/usr/local/bin/python3.13`, installed with
 `openbsd_python_package` when targeting a release with a different Python branch.
 
 Use a non-root account with a working SSH key and root privilege escalation.
+Before changing authentication, the role verifies a separate key-only SSH login
+without reusing an existing connection, while retaining host verification and proxy options.
 Verify the host key against the fingerprint shown on the VM console before
 accepting it in your normal `known_hosts`. Host key checking stays enabled.
 

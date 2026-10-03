@@ -51,16 +51,17 @@ Set name(s) = -game* -x* -comp*"
     puts "Generated install.conf with interpolated passwords"
 }
 
-puts "Starting Python web server on port 8686..."
-set python_executable [exec uv run --locked python -c {import sys; print(sys.executable)}]
-set WEB_SERVER_PID [exec $python_executable -m http.server 8686 --bind 127.0.0.1 &]
+set WEB_SERVER_PID ""
+set WEB_SERVER_SPAWN_ID ""
 
 proc cleanup {} {
-    global WEB_SERVER_PID INSTALL_CONF_CREATED
+    global WEB_SERVER_PID WEB_SERVER_SPAWN_ID INSTALL_CONF_CREATED
     puts "Cleaning up..."
     if {$WEB_SERVER_PID != ""} {
         puts "Stopping Python web server (PID: $WEB_SERVER_PID)..."
         catch {exec kill $WEB_SERVER_PID}
+        catch {close -i $WEB_SERVER_SPAWN_ID}
+        catch {wait -i $WEB_SERVER_SPAWN_ID}
     }
     if {$INSTALL_CONF_CREATED} {
         file delete -force "install.conf"
@@ -71,16 +72,20 @@ proc cleanup {} {
 # script's exit status is replaced with 0.
 exit -onexit cleanup
 
-puts "Waiting for web server to start listening on port 8686..."
-set server_deadline [expr {[clock seconds] + 10}]
-while {[catch {socket 127.0.0.1 8686} server_socket]} {
-    if {[clock seconds] >= $server_deadline} {
-        puts "Error: web server did not start within 10 seconds."
-        exit 1
-    }
-    sleep 0.1
+puts "Starting Python web server on port 8686..."
+set python_executable [exec uv run --locked python -c {import sys; print(sys.executable)}]
+spawn -noecho $python_executable -u -m http.server 8686 --bind 127.0.0.1
+set WEB_SERVER_PID [exp_pid]
+set WEB_SERVER_SPAWN_ID $spawn_id
+
+# Read readiness from this child after it binds, rather than accepting any
+# service that happens to be listening on the installation port.
+expect {
+    -timeout 10
+    -re {Serving HTTP on 127\.0\.0\.1 port 8686} {}
+    eof { puts "Error: installation web server exited before binding port 8686."; exit 1 }
+    timeout { puts "Error: installation web server did not start within 10 seconds."; exit 1 }
 }
-close $server_socket
 puts "Web server is now listening on port 8686"
 
 # Function to download file with error handling
@@ -137,7 +142,15 @@ if {![file exists $ISO_FILE]} {
 
 # Verify SHA256 checksums
 puts "Verifying SHA256 checksums..."
-set sha256_result [catch {exec sha256sum -c SHA256 --ignore-missing} sha256_output]
+set checksum_command [auto_execok sha256sum]
+if {$checksum_command eq ""} {
+    set checksum_command [auto_execok gsha256sum]
+}
+if {$checksum_command eq ""} {
+    puts "Error: install GNU coreutils for sha256sum or gsha256sum."
+    exit 1
+}
+set sha256_result [catch {exec {*}$checksum_command -c SHA256 --ignore-missing} sha256_output]
 if {$sha256_result != 0} {
     puts "Error: SHA256 verification failed: $sha256_output"
     cleanup
