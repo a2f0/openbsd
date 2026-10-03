@@ -3,11 +3,15 @@
 # Usage: ./boot.exp          boot the VM and attach to its console
 #        ./boot.exp --check  boot the VM, verify console and ssh logins, then
 #                            power it off (requires USER_PASSWORD)
-#        ./boot.exp --check-hardened  also apply and verify the Ansible baseline
+#        ./boot.exp --check-hardened  also apply and verify the native baseline
 #                                    (requires ROOT_PASSWORD and SSH_IDENTITY_FILE)
+#        ./boot.exp --verify-hardened verify persistence after a reboot
 
 set VM_RUNNING 0
 set known_hosts_file ""
+set archive_file ""
+set auth_log_file ""
+set VERIFY_ONLY 0
 
 proc shutdown_vm {} {
     global VM_RUNNING spawn_id
@@ -43,16 +47,23 @@ exit -onexit {
     if {$::known_hosts_file ne ""} {
         file delete -force $::known_hosts_file
     }
+    if {$::archive_file ne ""} {
+        file delete -force $::archive_file
+    }
+    if {$::auth_log_file ne ""} {
+        file delete -force $::auth_log_file
+    }
 }
 
 set HARDEN 0
 if {$argc == 0} {
     set CHECK 0
-} elseif {$argc == 1 && [lindex $argv 0] in {--check --check-hardened}} {
+} elseif {$argc == 1 && [lindex $argv 0] in {--check --check-hardened --verify-hardened}} {
     set CHECK 1
-    set HARDEN [expr {[lindex $argv 0] eq "--check-hardened"}]
+    set HARDEN [expr {[lindex $argv 0] ne "--check"}]
+    set VERIFY_ONLY [expr {[lindex $argv 0] eq "--verify-hardened"}]
 } else {
-    puts "Usage: $argv0 \[--check|--check-hardened\]"
+    puts "Usage: $argv0 \[--check|--check-hardened|--verify-hardened\]"
     exit 1
 }
 
@@ -65,9 +76,20 @@ if {$HARDEN} {
     }
 }
 
-if {$CHECK && ![info exists env(USER_PASSWORD)]} {
-    puts "Error: USER_PASSWORD must be set for --check."
-    exit 1
+if {$CHECK} {
+    set password_vars {USER_PASSWORD}
+    if {$HARDEN} {
+        lappend password_vars ROOT_PASSWORD
+    }
+    foreach password_var $password_vars {
+        if {
+            ![info exists env($password_var)] || $env($password_var) eq "" ||
+            [regexp {[\r\n]} $env($password_var)]
+        } {
+            puts "Error: $password_var must be nonempty and contain no newlines."
+            exit 1
+        }
+    }
 }
 
 puts "Starting OpenBSD VM with SSH access..."
@@ -127,45 +149,70 @@ if {$CHECK} {
     # Log in over ssh with the user's installed key. SSH_IDENTITY_FILE picks
     # the private key (CI uses a throwaway one), otherwise ssh's defaults apply.
     set ssh_cmd [list ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
+        -o PreferredAuthentications=publickey -o PasswordAuthentication=no \
+        -o KbdInteractiveAuthentication=no -o ControlMaster=no -S none \
+        -o ForkAfterAuthentication=no -o StdinNull=no -o RequestTTY=no \
         -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts_file \
         -o LogLevel=ERROR]
     if {[info exists env(SSH_IDENTITY_FILE)] && $env(SSH_IDENTITY_FILE) ne ""} {
         lappend ssh_cmd -i $env(SSH_IDENTITY_FILE) -o IdentitiesOnly=yes
     }
-    lappend ssh_cmd a2f0@127.0.0.1 uname -sr
-    if {[catch {exec {*}$ssh_cmd 2>@1} ssh_out] || ![string match "OpenBSD *" $ssh_out]} {
+    lappend ssh_cmd a2f0@127.0.0.1
+    set auth_log_file [exec mktemp]
+    if {
+        [catch {exec {*}$ssh_cmd -v -E $auth_log_file uname -sr 2>@1} ssh_out] ||
+        ![string match "OpenBSD *" $ssh_out]
+    } {
         puts "\nError: ssh login as a2f0 failed: $ssh_out"
+        exit 1
+    }
+    set auth_log [open $auth_log_file r]
+    set auth_output [read $auth_log]
+    close $auth_log
+    if {![regexp -line {^Authenticated to .* using "publickey"\.$} $auth_output]} {
+        puts "\nError: SSH did not authenticate with a public key"
         exit 1
     }
     puts "\nssh login as a2f0 succeeded: $ssh_out"
 
     if {$HARDEN} {
-        # The installer gives a2f0 wheel membership. Use su with the console
-        # root password for this disposable VM; normal hosts use doas.
-        set env(ANSIBLE_SU_PASS) $env(ROOT_PASSWORD)
-        set ansible_cmd [list uv run --locked ansible-playbook \
-            --private-key $env(SSH_IDENTITY_FILE) \
-            --ssh-common-args "-o StrictHostKeyChecking=yes \
-                -o UserKnownHostsFile=$known_hosts_file -o IdentitiesOnly=yes" \
-            --extra-vars {ansible_become_method=ansible.builtin.su}]
-        foreach playbook {ansible/bootstrap.yml ansible/harden.yml ansible/harden.yml} {
-            puts "\nRunning $playbook..."
-            if {[catch {exec {*}$ansible_cmd $playbook 2>@1} ansible_out]} {
-                puts "\nError: Ansible failed: $ansible_out"
-                exit 1
-            }
-            puts $ansible_out
-        }
-        # The second hardening run must make no changes.
-        if {![regexp {changed=0\s+unreachable=0\s+failed=0} $ansible_out]} {
-            puts "\nError: the baseline is not idempotent"
+        set archive_file [exec mktemp]
+        if {
+            [catch {
+                exec tar -cf $archive_file baseline tests
+                exec {*}$ssh_cmd tar -xpf - -C /home/a2f0 < $archive_file 2>@1
+            } transfer_out]
+        } {
+            puts "\nError: baseline transfer failed: $transfer_out"
             exit 1
         }
-        if {[catch {exec {*}$ssh_cmd 2>@1} ssh_out]} {
+        # Use the root console on the disposable VM. No remote interpreter,
+        # package bootstrap, password SSH login, or new doas rule is needed.
+        send "su -\r"
+        expect "Password:"
+        send -- "$env(ROOT_PASSWORD)\r"
+        expect {
+            "Sorry" { puts "\nError: root console login failed"; exit 1 }
+            -re {# $} {}
+        }
+        if {$VERIFY_ONLY} {
+            set command "/bin/sh /home/a2f0/baseline/baseline.sh verify \
+                --ssh-context user=a2f0,host=10.0.2.2,addr=10.0.2.2,laddr=10.0.2.15,lport=22"
+        } else {
+            set command "/bin/sh /home/a2f0/tests/on-host.sh"
+        }
+        send -- "$command; printf '\\n__BASELINE_STATUS__:%s\\n' \"\$?\"\r"
+        expect -timeout 180 -re {\r+\n__BASELINE_STATUS__:([0-9]+)\r+\n}
+        if {$expect_out(1,string) ne "0"} {
+            puts "\nError: native baseline checks failed"
+            exit 1
+        }
+        expect -re {# $}
+        if {[catch {exec {*}$ssh_cmd uname -sr 2>@1} ssh_out]} {
             puts "\nError: SSH login failed after hardening: $ssh_out"
             exit 1
         }
-        puts "\nHardening and idempotence checks passed"
+        puts "\nNative hardening and fresh SSH checks passed"
     }
 
     shutdown_vm

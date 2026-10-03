@@ -1,20 +1,21 @@
-.PHONY: deps lint format syntax
-
-EXPECT_RUN = UV_PROJECT_ENVIRONMENT=.venv-expect uv run --locked --no-default-groups --group expect
+.PHONY: deps lint format syntax test
 
 deps:
 	uv sync --locked
-	UV_PROJECT_ENVIRONMENT=.venv-expect uv sync --locked --no-default-groups --group expect
-	uv run --locked ansible-galaxy collection install --no-deps -r ansible/requirements.yml -p .ansible/collections
 
 lint:
-	$(EXPECT_RUN) tclint .
-	$(EXPECT_RUN) tclfmt --check .
-	uv run --locked ansible-lint
+	uv run --locked tclint .
+	uv run --locked tclfmt --check .
+	uv run --locked shellcheck baseline/*.sh deploy.sh tests/*.sh
 
 format:
-	$(EXPECT_RUN) tclfmt --in-place .
+	uv run --locked tclfmt --in-place .
 
 syntax:
-	uv run --locked ansible-playbook ansible/bootstrap.yml --syntax-check
-	uv run --locked ansible-playbook ansible/harden.yml --syntax-check
+	sh -n baseline/baseline.sh
+	sh -n deploy.sh
+	sh -n tests/on-host.sh
+	sh -n tests/controller.sh
+
+test:
+	sh tests/controller.sh

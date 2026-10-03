@@ -19,8 +19,8 @@ jobs:
           version: "0.12.22"
       - name: Install locked dependencies
         run: make deps
-      - name: Lint Expect and Ansible
-        run: make lint syntax
+      - name: Lint Expect and shell scripts
+        run: make lint syntax test
 
   check:
     needs: lint
@@ -57,7 +57,9 @@ jobs:
           SSH_PUBLIC_KEY: ${{ steps.ssh-key.outputs.public-key }}
 
       - name: Check logins, apply the baseline, and verify idempotence
-        run: ./boot.exp --check-hardened
+        run: |
+          ./boot.exp --check-hardened
+          ./boot.exp --verify-hardened
         timeout-minutes: 20
         env:
           USER_PASSWORD: CICD

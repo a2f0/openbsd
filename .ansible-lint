@@ -1,5 +1,0 @@
-profile: safety
-exclude_paths:
-  - .venv/
-  - .venv-expect/
-  - .ansible/

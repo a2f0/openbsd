@@ -6,17 +6,11 @@ requires-python = ">=3.14,<3.15"
 dependencies = []
 
 [dependency-groups]
-ansible = [
-    "ansible-core==2.21.4",
-    "ansible-lint==26.9.0",
-]
-expect = ["tclint==0.9.0"]
+dev = ["tclint==0.9.0", "shellcheck-py==0.11.0.1"]
 
 [tool.uv]
 package = false
-default-groups = ["ansible"]
-# These linters currently require incompatible versions of pathspec.
-conflicts = [[{ group = "ansible" }, { group = "expect" }]]
+default-groups = ["dev"]
 
 [tool.tclint]
 extensions = ["exp", "tcl"]
