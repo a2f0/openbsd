@@ -1,5 +1,0 @@
----
-ansible_python_interpreter: /usr/local/bin/python3.13
-ansible_become_method: community.general.doas
-# OpenBSD 7.9 names the port branch lang/python/3, not lang/python/3.13.
-openbsd_python_package: python%3

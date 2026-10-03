@@ -1,6 +1,0 @@
----
-- name: Apply the OpenBSD security baseline
-  hosts: openbsd
-  become: true
-  roles:
-    - openbsd_baseline
