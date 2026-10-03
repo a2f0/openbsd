@@ -1,0 +1,29 @@
+[project]
+name = "openbsd-automation"
+version = "0.1.0"
+description = "OpenBSD VM provisioning and security baseline tooling"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[dependency-groups]
+ansible = [
+    "ansible-core==2.21.4",
+    "ansible-lint==26.9.0",
+]
+expect = ["tclint==0.9.0"]
+
+[tool.uv]
+package = false
+default-groups = ["ansible"]
+# These linters currently require incompatible versions of pathspec.
+conflicts = [[{ group = "ansible" }, { group = "expect" }]]
+
+[tool.tclint]
+extensions = ["exp", "tcl"]
+commands = ["expect"]
+exclude = [".venv*/", ".ansible/", ".git/"]
+
+[tool.tclint.style]
+indent = 4
+line-length = 100
+max-blank-lines = 1

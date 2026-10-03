@@ -3,3 +3,7 @@
 *.rd
 SHA256
 install.conf
+.venv*/
+.ansible/
+.cache/
+__pycache__/

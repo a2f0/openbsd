@@ -1,0 +1,14 @@
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+HostbasedAuthentication no
+IgnoreRhosts yes
+StrictModes yes
+X11Forwarding no
+DisableForwarding {{ 'yes' if openbsd_baseline_ssh_disable_forwarding else 'no' }}
+MaxAuthTries {{ openbsd_baseline_ssh_max_auth_tries }}
+LoginGraceTime {{ openbsd_baseline_ssh_login_grace_time }}
+LogLevel VERBOSE

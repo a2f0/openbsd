@@ -3,14 +3,66 @@
 # Usage: ./boot.exp          boot the VM and attach to its console
 #        ./boot.exp --check  boot the VM, verify console and ssh logins, then
 #                            power it off (requires USER_PASSWORD)
+#        ./boot.exp --check-hardened  also apply and verify the Ansible baseline
+#                                    (requires ROOT_PASSWORD and SSH_IDENTITY_FILE)
 
+set VM_RUNNING 0
+set known_hosts_file ""
+
+proc shutdown_vm {} {
+    global VM_RUNNING spawn_id
+    if {!$VM_RUNNING} {
+        return
+    }
+    # A failed check must still let the guest flush its filesystems. Clear
+    # the normal failure handlers so cleanup cannot recursively call exit.
+    expect_after
+    send -- "\u0001c"
+    expect {
+        -timeout 5
+        "(qemu)" {}
+        eof { set VM_RUNNING 0; return }
+        timeout { error "Timed out opening the QEMU monitor" }
+    }
+    send "system_powerdown\r"
+    expect {
+        -timeout 120
+        eof {}
+        timeout {
+            send "quit\r"
+            expect -timeout 10 eof
+            set VM_RUNNING 0
+            error "VM did not shut down within 120 seconds"
+        }
+    }
+    set VM_RUNNING 0
+}
+
+exit -onexit {
+    catch {shutdown_vm}
+    if {$::known_hosts_file ne ""} {
+        file delete -force $::known_hosts_file
+    }
+}
+
+set HARDEN 0
 if {$argc == 0} {
     set CHECK 0
-} elseif {$argc == 1 && [lindex $argv 0] eq "--check"} {
+} elseif {$argc == 1 && [lindex $argv 0] in {--check --check-hardened}} {
     set CHECK 1
+    set HARDEN [expr {[lindex $argv 0] eq "--check-hardened"}]
 } else {
-    puts "Usage: $argv0 \[--check\]"
+    puts "Usage: $argv0 \[--check|--check-hardened\]"
     exit 1
+}
+
+if {$HARDEN} {
+    foreach required_var {ROOT_PASSWORD SSH_IDENTITY_FILE} {
+        if {![info exists env($required_var)] || $env($required_var) eq ""} {
+            puts "Error: $required_var must be set for --check-hardened."
+            exit 1
+        }
+    }
 }
 
 if {$CHECK && ![info exists env(USER_PASSWORD)]} {
@@ -35,8 +87,9 @@ spawn qemu-system-x86_64 \
     -serial mon:stdio \
     -hda openbsd-vm.qcow2 \
     -net nic,model=e1000 \
-    -net user,hostfwd=tcp::2222-:22 \
+    -net user,hostfwd=tcp:127.0.0.1:2222-:22 \
     -boot c
+set VM_RUNNING 1
 
 # Fail if any expect below times out or QEMU exits, instead of carrying on
 expect_after {
@@ -58,11 +111,24 @@ if {$CHECK} {
     }
     send "uname -sr\r"
     expect -re {OpenBSD [0-9]+\.[0-9]+}
+    expect -re {\$ $}
+
+    # Trust the SSH host key obtained from the VM console, rather than
+    # disabling host key verification for the smoke test.
+    send "cat /etc/ssh/ssh_host_ed25519_key.pub\r"
+    expect -re {\r\n(ssh-ed25519 [A-Za-z0-9+/=]+)[ \r\n]}
+    set host_key $expect_out(1,string)
+    expect -re {\$ $}
+    set known_hosts_file [exec mktemp]
+    set known_hosts [open $known_hosts_file w]
+    puts $known_hosts "\[127.0.0.1\]:2222 $host_key"
+    close $known_hosts
 
     # Log in over ssh with the user's installed key. SSH_IDENTITY_FILE picks
     # the private key (CI uses a throwaway one), otherwise ssh's defaults apply.
     set ssh_cmd [list ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
-        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR]
+        -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts_file \
+        -o LogLevel=ERROR]
     if {[info exists env(SSH_IDENTITY_FILE)] && $env(SSH_IDENTITY_FILE) ne ""} {
         lappend ssh_cmd -i $env(SSH_IDENTITY_FILE) -o IdentitiesOnly=yes
     }
@@ -73,17 +139,39 @@ if {$CHECK} {
     }
     puts "\nssh login as a2f0 succeeded: $ssh_out"
 
-    # Enter the qemu monitor (cntrl+a, then c) and shut down the vm
-    send "\x01"
-    sleep 0.1
-    send "c"
-    expect "(qemu)"
-    send "system_powerdown\r"
-    expect -timeout 120 eof
+    if {$HARDEN} {
+        # The installer gives a2f0 wheel membership. Use su with the console
+        # root password for this disposable VM; normal hosts use doas.
+        set env(ANSIBLE_SU_PASS) $env(ROOT_PASSWORD)
+        set ansible_cmd [list uv run --locked ansible-playbook \
+            --private-key $env(SSH_IDENTITY_FILE) \
+            --ssh-common-args "-o StrictHostKeyChecking=yes \
+                -o UserKnownHostsFile=$known_hosts_file -o IdentitiesOnly=yes" \
+            --extra-vars {ansible_become_method=ansible.builtin.su}]
+        foreach playbook {ansible/bootstrap.yml ansible/harden.yml ansible/harden.yml} {
+            puts "\nRunning $playbook..."
+            if {[catch {exec {*}$ansible_cmd $playbook 2>@1} ansible_out]} {
+                puts "\nError: Ansible failed: $ansible_out"
+                exit 1
+            }
+            puts $ansible_out
+        }
+        # The second hardening run must make no changes.
+        if {![regexp {changed=0\s+unreachable=0\s+failed=0} $ansible_out]} {
+            puts "\nError: the baseline is not idempotent"
+            exit 1
+        }
+        if {[catch {exec {*}$ssh_cmd 2>@1} ssh_out]} {
+            puts "\nError: SSH login failed after hardening: $ssh_out"
+            exit 1
+        }
+        puts "\nHardening and idempotence checks passed"
+    }
+
+    shutdown_vm
 
     puts "\nCheck passed"
     exit 0
 }
 
 interact
-
