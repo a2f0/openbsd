@@ -1,0 +1,161 @@
+---
+- name: Require OpenBSD and a non-root SSH key connection
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['system'] == 'OpenBSD'
+      - ansible_user is defined
+      - ansible_user != 'root'
+      - (ansible_connection | default('ssh')) == 'ssh'
+      - ansible_password is not defined
+      - ansible_ssh_pass is not defined
+      - "'sshd' not in openbsd_baseline_disabled_services"
+    fail_msg: Use a non-root SSH key login with working privilege escalation.
+
+- name: Preserve the configured SSH options for the key login probe
+  ansible.builtin.set_fact:
+    openbsd_baseline_original_ssh_args: >-
+      {{ lookup('ansible.builtin.config', 'ssh_args',
+                plugin_type='connection', plugin_name='ssh') }}
+    openbsd_baseline_original_ssh_extra_args: >-
+      {{ lookup('ansible.builtin.config', 'ssh_extra_args',
+                plugin_type='connection', plugin_name='ssh') | default('', true) }}
+
+# CLI passwords are stored outside host variables. Prove that the key works
+# over a separate connection before disabling any existing login method.
+# Put these options first: OpenSSH uses the first value, and ControlPath=none
+# prevents an existing password-authenticated master from satisfying the probe.
+# A final SSH-only -S none also overrides any later short socket options; keep
+# it out of shared ssh_args because SFTP/SCP give -S a different meaning.
+- name: Require an independent SSH key login before changing authentication
+  vars:
+    ansible_ssh_args: >-
+      -o BatchMode=yes -o PreferredAuthentications=publickey
+      -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no
+      -o ControlPath=none {{ openbsd_baseline_original_ssh_args }}
+    ansible_ssh_extra_args: "{{ openbsd_baseline_original_ssh_extra_args }} -S none"
+  block:
+    - name: Require key probe options to precede user SSH overrides
+      ansible.builtin.assert:
+        that: >-
+          ansible_ssh_args.startswith('-o BatchMode=yes -o PreferredAuthentications=publickey '
+          '-o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ControlPath=none ')
+          and ansible_ssh_extra_args.endswith(' -S none')
+        fail_msg: Remove SSH argument extra-vars overrides so the key login probe can run safely.
+
+    - name: Verify independent SSH key authentication
+      ansible.builtin.ping:
+      become: false
+      check_mode: false
+
+- name: Require every configured sysctl to exist
+  ansible.builtin.command:
+    argv:
+      - /sbin/sysctl
+      - -n
+      - "{{ item.key }}"
+  loop: "{{ openbsd_baseline_sysctls | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  changed_when: false
+  check_mode: false
+
+- name: Apply available base system patches
+  community.general.syspatch:
+  register: openbsd_baseline_syspatch
+  when: openbsd_baseline_apply_syspatches | bool
+
+- name: Report a required patch reboot
+  ansible.builtin.debug:
+    msg: System patches require a reboot; schedule it after reviewing this run.
+  when:
+    - openbsd_baseline_apply_syspatches | bool
+    - openbsd_baseline_syspatch.reboot_needed | default(false)
+
+- name: Update installed packages
+  community.general.openbsd_pkg:
+    name: "*"
+    state: latest
+  when: openbsd_baseline_update_packages | bool
+
+- name: Apply and persist OpenBSD kernel settings
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.conf
+    sysctl_set: true
+    reload: false
+    state: present
+  loop: "{{ openbsd_baseline_sysctls | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Read back the applied kernel settings
+  ansible.builtin.command:
+    argv:
+      - /sbin/sysctl
+      - -n
+      - "{{ item.key }}"
+  loop: "{{ openbsd_baseline_sysctls | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: openbsd_baseline_sysctl_results
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Verify every kernel setting took effect
+  ansible.builtin.assert:
+    that: (item.stdout | trim) == (item.item.value | string)
+    fail_msg: "Kernel setting {{ item.item.key }} did not take effect."
+  loop: "{{ openbsd_baseline_sysctl_results.results }}"
+  loop_control:
+    label: "{{ item.item.key }}"
+  when: not ansible_check_mode
+
+- name: Disable explicitly selected services
+  ansible.builtin.service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop: "{{ openbsd_baseline_disabled_services }}"
+
+# OpenSSH uses the first global value. Keep this before existing directives
+# and Match blocks, and validate the complete candidate before replacing it.
+- name: Install and validate the SSH baseline
+  ansible.builtin.blockinfile:
+    path: /etc/ssh/sshd_config
+    insertbefore: BOF
+    marker: "# {mark} ANSIBLE OPENBSD BASELINE"
+    block: "{{ lookup('ansible.builtin.template', 'sshd_baseline.j2') }}"
+    owner: root
+    group: wheel
+    mode: "0600"
+    backup: true
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Apply the SSH configuration before checking access
+  ansible.builtin.meta: flush_handlers
+
+- name: Read the effective global SSH policy
+  ansible.builtin.command: /usr/sbin/sshd -T
+  register: openbsd_baseline_ssh_policy
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Verify the SSH authentication policy
+  ansible.builtin.assert:
+    that:
+      - "'permitrootlogin no' in openbsd_baseline_ssh_policy.stdout_lines"
+      - "'passwordauthentication no' in openbsd_baseline_ssh_policy.stdout_lines"
+      - "'kbdinteractiveauthentication no' in openbsd_baseline_ssh_policy.stdout_lines"
+      - "'authenticationmethods publickey' in openbsd_baseline_ssh_policy.stdout_lines"
+  when: not ansible_check_mode
+
+- name: Close the old SSH connection
+  ansible.builtin.meta: reset_connection
+
+- name: Verify access with a fresh SSH connection
+  ansible.builtin.wait_for_connection:
+    timeout: 60
+  become: false
+  when: not ansible_check_mode

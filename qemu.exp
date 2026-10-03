@@ -1,13 +1,24 @@
 #!/usr/bin/expect -f
 
-# Get host IP for QEMU networking
-set HOST_IP [exec ip route get 1.1.1.1 | awk {{print $7; exit}}]
+set INSTALL_CONF_CREATED 0
+
+foreach required_var {USER_PASSWORD ROOT_PASSWORD} {
+    if {![info exists env($required_var)] || $env($required_var) eq ""} {
+        puts "Error: $required_var must be set."
+        exit 1
+    }
+    if {[regexp {[\r\n]} $env($required_var)]} {
+        puts "Error: $required_var must not contain newlines."
+        exit 1
+    }
+}
 
 # Function to generate install.conf with environment variable interpolation
 proc generate_install_conf {} {
-    set user_password [exec env | grep -E "^USER_PASSWORD=" | cut -d= -f2-]
-    set root_password [exec env | grep -E "^ROOT_PASSWORD=" | cut -d= -f2-]
+    set user_password $::env(USER_PASSWORD)
+    set root_password $::env(ROOT_PASSWORD)
     # SSH_PUBLIC_KEY replaces the default key for the user (CI passes a throwaway key)
+    # tclint-disable-next-line line-length -- Keep the existing public key intact.
     set ssh_public_key "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDNc4EolzqwqciuPM12WtwA/tC0GjUL6q6XZyEr/VJC0TEACwP6syaqLPET1JxDx7Bsb93uQM7YT9gkn8iAZzw6nAelcixA2lw3b5TUGjyb10zDgGmtZb2r6ksbBokdWdRQzTg2Io+aNv5z27V0lmoEzqN/ePX74GY4oPUWt3CfNqAquS5Ig7YolX0F3BfcjXyFmZ9xWK0BxHP+s/37+GK3S1vb3WjLUV+OEX4E4g4nn/P2iuMUkon+GEQj5kajX97hQ2P5PDGztUPgu2nIeQMMOV3ktetgBc1qWflYEM/1WwKeC0bFvwtNiDmDAipJfJU4NQJ2DI31pOfbOydnkJyl dansullivan@gmail.com"
     if {[info exists ::env(SSH_PUBLIC_KEY)] && $::env(SSH_PUBLIC_KEY) ne ""} {
         set ssh_public_key $::env(SSH_PUBLIC_KEY)
@@ -29,35 +40,31 @@ Partitioning = auto
 # Directory does not contain SHA256.sig. Continue without verification?
 Continue without verification? = yes
 Set name(s) = -game* -x* -comp*"
-    
+
     # Write the content to install.conf
-    set file [open "install.conf" w]
+    set file [open "install.conf" {WRONLY CREAT TRUNC} 0600]
+    set ::INSTALL_CONF_CREATED 1
+    file attributes "install.conf" -permissions 0600
     puts $file $conf_content
     close $file
-    
+
     puts "Generated install.conf with interpolated passwords"
 }
 
-puts "Starting Python web server on port 8686..."
-exec python3 -m http.server 8686 &
-set WEB_SERVER_PID [exec pgrep -f "python3 -m http.server 8686"]
-
-puts "Waiting for web server to start listening on port 8686..."
-while {1} {
-    set result [catch {exec netstat -tuln | grep ":8686 "} output]
-    if {$result == 0 && $output != ""} {
-        break
-    }
-    sleep 0.1
-}
-puts "Web server is now listening on port 8686"
+set WEB_SERVER_PID ""
+set WEB_SERVER_SPAWN_ID ""
 
 proc cleanup {} {
-    global WEB_SERVER_PID
+    global WEB_SERVER_PID WEB_SERVER_SPAWN_ID INSTALL_CONF_CREATED
     puts "Cleaning up..."
     if {$WEB_SERVER_PID != ""} {
         puts "Stopping Python web server (PID: $WEB_SERVER_PID)..."
         catch {exec kill $WEB_SERVER_PID}
+        catch {close -i $WEB_SERVER_SPAWN_ID}
+        catch {wait -i $WEB_SERVER_SPAWN_ID}
+    }
+    if {$INSTALL_CONF_CREATED} {
+        file delete -force "install.conf"
     }
 }
 
@@ -65,17 +72,33 @@ proc cleanup {} {
 # script's exit status is replaced with 0.
 exit -onexit cleanup
 
+puts "Starting Python web server on port 8686..."
+set python_executable [exec uv run --locked python -c {import sys; print(sys.executable)}]
+spawn -noecho $python_executable -u -m http.server 8686 --bind 127.0.0.1
+set WEB_SERVER_PID [exp_pid]
+set WEB_SERVER_SPAWN_ID $spawn_id
+
+# Read readiness from this child after it binds, rather than accepting any
+# service that happens to be listening on the installation port.
+expect {
+    -timeout 10
+    -re {Serving HTTP on 127\.0\.0\.1 port 8686} {}
+    eof { puts "Error: installation web server exited before binding port 8686."; exit 1 }
+    timeout { puts "Error: installation web server did not start within 10 seconds."; exit 1 }
+}
+puts "Web server is now listening on port 8686"
+
 # Function to download file with error handling
 proc download_file {url filename} {
     puts "Attempting to download $filename from $url"
-    
+
     # Try wget
     set wget_result [catch {exec wget -q -O $filename $url} wget_output]
     if {$wget_result == 0} {
         puts "Download completed successfully using wget"
         return 1
     }
-    
+
     puts "wget failed: $wget_output"
     puts "Please install wget or download manually."
     return 0
@@ -87,16 +110,10 @@ set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
 set SHA256_FILE "SHA256"
 set DISK_FILE "openbsd-vm.qcow2"
 
-set ARCH [exec uname -m]
-if {$ARCH != "x86_64"} {
-    puts "Error: This script requires x86_64 architecture. Current architecture: $ARCH"
-    exit 1
-}
-
 if {![file exists $SHA256_FILE]} {
     puts "ISO file not found: $SHA256_FILE"
     set download_url "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/SHA256"
-    
+
     if {[download_file $download_url $SHA256_FILE]} {
         puts "Download completed: $SHA256_FILE"
     } else {
@@ -111,7 +128,7 @@ if {![file exists $SHA256_FILE]} {
 if {![file exists $ISO_FILE]} {
     puts "ISO file not found: $ISO_FILE"
     set download_url "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/$ISO_FILE"
-    
+
     if {[download_file $download_url $ISO_FILE]} {
         puts "Download completed: $ISO_FILE"
     } else {
@@ -125,7 +142,15 @@ if {![file exists $ISO_FILE]} {
 
 # Verify SHA256 checksums
 puts "Verifying SHA256 checksums..."
-set sha256_result [catch {exec sha256sum -c SHA256 --ignore-missing} sha256_output]
+set checksum_command [auto_execok sha256sum]
+if {$checksum_command eq ""} {
+    set checksum_command [auto_execok gsha256sum]
+}
+if {$checksum_command eq ""} {
+    puts "Error: install GNU coreutils for sha256sum or gsha256sum."
+    exit 1
+}
+set sha256_result [catch {exec {*}$checksum_command -c SHA256 --ignore-missing} sha256_output]
 if {$sha256_result != 0} {
     puts "Error: SHA256 verification failed: $sha256_output"
     cleanup
@@ -144,15 +169,15 @@ generate_install_conf
 puts "Creating virtual disk image..."
 exec qemu-img create -f qcow2 $DISK_FILE 5G
 
-puts "Starting QEMU with network access to host IP: $HOST_IP"
+puts "Starting QEMU with host access through 10.0.2.2"
 
 spawn qemu-system-x86_64 \
-  -m 4096 \
-  -smp cpus=2 \
-  -nographic \
-  -cdrom $ISO_FILE \
-  -hda $DISK_FILE \
-  -boot c
+    -m 4096 \
+    -smp cpus=2 \
+    -nographic \
+    -cdrom $ISO_FILE \
+    -hda $DISK_FILE \
+    -boot c
 
 # Fail if any expect below times out or QEMU exits, instead of carrying on
 expect_after {
@@ -172,7 +197,7 @@ expect -timeout 600 "login: "
 
 # Enter the qemu menu by pressing cntrl+a, then c
 # cntrl + a
-send "\x01" 
+send "\x01"
 sleep 0.1
 send "c"
 
@@ -181,13 +206,10 @@ expect "(qemu)"
 # qemu command to shut down the vm
 send "system_powerdown\r"
 
-# Wait for the VM to shut down completely
-# expect -timeout 60 "qemu-system-x86_64: terminating on signal"
-
 puts "Waiting for vm to stop..."
 
-# Wait for the spawn process to finish
+# Drain the console until QEMU exits before reaping the child process.
+expect -timeout 120 eof
 wait
-
 
 puts "\rFinished"

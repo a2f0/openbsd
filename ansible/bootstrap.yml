@@ -1,0 +1,28 @@
+---
+- name: Bootstrap Python on OpenBSD
+  hosts: openbsd
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Identify the target without Python
+      ansible.builtin.raw: /usr/bin/uname -s
+      register: openbsd_bootstrap_os
+      changed_when: false
+      check_mode: false
+
+    - name: Require an OpenBSD target
+      ansible.builtin.assert:
+        that: openbsd_bootstrap_os.stdout | trim == 'OpenBSD'
+        fail_msg: This bootstrap playbook supports OpenBSD only.
+
+    - name: Install the selected Python branch when absent
+      ansible.builtin.raw: >-
+        if test -x {{ ansible_python_interpreter | quote }}; then
+          echo python-already-installed;
+        else
+          /usr/sbin/pkg_add -I {{ openbsd_python_package | quote }} &&
+          test -x {{ ansible_python_interpreter | quote }};
+        fi
+      register: openbsd_bootstrap_python
+      changed_when: "'python-already-installed' not in openbsd_bootstrap_python.stdout"
+      when: not ansible_check_mode

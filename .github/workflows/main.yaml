@@ -2,18 +2,45 @@ name: main
 
 on:
   push:
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  lint:
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.22"
+      - name: Install locked dependencies
+        run: make deps
+      - name: Lint Expect and Ansible
+        run: make lint syntax
+
+  check:
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.12.22"
+
+      - name: Install locked dependencies
+        run: make deps
 
       - name: Install expect and qemu
         run: |
           sudo apt-get update
-          sudo apt-get install -y expect qemu-system-x86
+          sudo apt-get install -y expect qemu-system-x86 wget coreutils
 
       - name: Generate throwaway ssh key
         id: ssh-key
@@ -29,9 +56,10 @@ jobs:
           ROOT_PASSWORD: CICD
           SSH_PUBLIC_KEY: ${{ steps.ssh-key.outputs.public-key }}
 
-      - name: Boot installed VM and check console and ssh logins
-        run: ./boot.exp --check
-        timeout-minutes: 10
+      - name: Check logins, apply the baseline, and verify idempotence
+        run: ./boot.exp --check-hardened
+        timeout-minutes: 20
         env:
           USER_PASSWORD: CICD
+          ROOT_PASSWORD: CICD
           SSH_IDENTITY_FILE: ${{ runner.temp }}/ci_ssh_key
