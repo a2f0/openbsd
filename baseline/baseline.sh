@@ -41,7 +41,11 @@ cleanup() {
             rm /etc/sysctl.conf
         fi
         while IFS='=' read -r key value; do
-            sysctl "$key=$value" >/dev/null || printf 'Could not restore %s\n' "$key" >&2
+            current=$(read_sysctl "$key") || { printf 'Could not read %s during rollback\n' "$key" >&2; continue; }
+            if [ "$current" != "$value" ]; then
+                sysctl "$key=$value" >/dev/null
+                [ "$(read_sysctl "$key")" = "$value" ] || printf 'Could not restore %s\n' "$key" >&2
+            fi
         done < "$work/kernel.original"
         rcctl reload sshd || printf '%s\n' "Could not reload restored SSH configuration; use the console" >&2
     fi
@@ -54,6 +58,12 @@ restore_file() {
     install -o "$(stat -f '%u' "$original")" -g "$(stat -f '%g' "$original")" \
         -m "$(stat -f '%Lp' "$original")" "$original" "$target" ||
         printf 'Could not restore %s; use the console\n' "$target" >&2
+}
+read_sysctl() {
+    result=$(sysctl -n "$1") || die "Unknown sysctl: $1"
+    # OpenBSD's sysctl can warn and still exit zero for an unknown name.
+    [ -n "$result" ] || die "Unknown sysctl: $1"
+    printf '%s\n' "$result"
 }
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
@@ -73,10 +83,10 @@ strip_blocks() {
     awk '
         /^# BEGIN (NATIVE|ANSIBLE) OPENBSD BASELINE$/ {
             if (inside) exit 1
-            inside = 1; next
+            inside = $3; next
         }
         /^# END (NATIVE|ANSIBLE) OPENBSD BASELINE$/ {
-            if (!inside) exit 1
+            if (!inside || inside != $3) exit 1
             inside = 0; next
         }
         !inside { print }
@@ -112,7 +122,7 @@ awk '
 : > "$work/kernel.original"
 kernel_changes=0
 while IFS='=' read -r key value; do
-    actual=$(sysctl -n "$key") || die "Unknown sysctl: $key"
+    actual=$(read_sysctl "$key")
     printf '%s=%s\n' "$key" "$actual" >> "$work/kernel.original"
     if [ "$actual" != "$value" ]; then
         printf 'sysctl: %s: %s -> %s\n' "$key" "$actual" "$value"
@@ -157,8 +167,10 @@ esac
 
 applying=1
 while IFS='=' read -r key value; do
-    if [ "$(sysctl -n "$key")" != "$value" ]; then sysctl "$key=$value"; fi
-    [ "$(sysctl -n "$key")" = "$value" ] || die "Sysctl did not take effect: $key"
+    actual=$(read_sysctl "$key")
+    if [ "$actual" != "$value" ]; then sysctl "$key=$value"; fi
+    actual=$(read_sysctl "$key")
+    [ "$actual" = "$value" ] || die "Sysctl did not take effect: $key"
 done < "$work/kernel.expected"
 suffix=.baseline.$(date -u +%Y%m%dT%H%M%SZ).$$
 if [ "$sysctl_changed" -eq 1 ]; then

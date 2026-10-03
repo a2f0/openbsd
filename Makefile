@@ -1,4 +1,4 @@
-.PHONY: deps lint format syntax
+.PHONY: deps lint format syntax test
 
 deps:
 	uv sync --locked
@@ -15,3 +15,7 @@ syntax:
 	sh -n baseline/baseline.sh
 	sh -n deploy.sh
 	sh -n tests/on-host.sh
+	sh -n tests/controller.sh
+
+test:
+	sh tests/controller.sh

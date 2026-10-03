@@ -10,6 +10,7 @@
 set VM_RUNNING 0
 set known_hosts_file ""
 set archive_file ""
+set auth_log_file ""
 set VERIFY_ONLY 0
 
 proc shutdown_vm {} {
@@ -49,6 +50,9 @@ exit -onexit {
     if {$::archive_file ne ""} {
         file delete -force $::archive_file
     }
+    if {$::auth_log_file ne ""} {
+        file delete -force $::auth_log_file
+    }
 }
 
 set HARDEN 0
@@ -72,9 +76,20 @@ if {$HARDEN} {
     }
 }
 
-if {$CHECK && ![info exists env(USER_PASSWORD)]} {
-    puts "Error: USER_PASSWORD must be set for --check."
-    exit 1
+if {$CHECK} {
+    set password_vars {USER_PASSWORD}
+    if {$HARDEN} {
+        lappend password_vars ROOT_PASSWORD
+    }
+    foreach password_var $password_vars {
+        if {
+            ![info exists env($password_var)] || $env($password_var) eq "" ||
+            [regexp {[\r\n]} $env($password_var)]
+        } {
+            puts "Error: $password_var must be nonempty and contain no newlines."
+            exit 1
+        }
+    }
 }
 
 puts "Starting OpenBSD VM with SSH access..."
@@ -136,17 +151,26 @@ if {$CHECK} {
     set ssh_cmd [list ssh -p 2222 -o BatchMode=yes -o ConnectTimeout=10 \
         -o PreferredAuthentications=publickey -o PasswordAuthentication=no \
         -o KbdInteractiveAuthentication=no -o ControlMaster=no -S none \
+        -o ForkAfterAuthentication=no -o StdinNull=no -o RequestTTY=no \
         -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts_file \
         -o LogLevel=ERROR]
     if {[info exists env(SSH_IDENTITY_FILE)] && $env(SSH_IDENTITY_FILE) ne ""} {
         lappend ssh_cmd -i $env(SSH_IDENTITY_FILE) -o IdentitiesOnly=yes
     }
     lappend ssh_cmd a2f0@127.0.0.1
+    set auth_log_file [exec mktemp]
     if {
-        [catch {exec {*}$ssh_cmd uname -sr 2>@1} ssh_out] ||
+        [catch {exec {*}$ssh_cmd -v -E $auth_log_file uname -sr 2>@1} ssh_out] ||
         ![string match "OpenBSD *" $ssh_out]
     } {
         puts "\nError: ssh login as a2f0 failed: $ssh_out"
+        exit 1
+    }
+    set auth_log [open $auth_log_file r]
+    set auth_output [read $auth_log]
+    close $auth_log
+    if {![regexp -line {^Authenticated to .* using "publickey"\.$} $auth_output]} {
+        puts "\nError: SSH did not authenticate with a public key"
         exit 1
     }
     puts "\nssh login as a2f0 succeeded: $ssh_out"
@@ -178,7 +202,7 @@ if {$CHECK} {
             set command "/bin/sh /home/a2f0/tests/on-host.sh"
         }
         send -- "$command; printf '\\n__BASELINE_STATUS__:%s\\n' \"\$?\"\r"
-        expect -timeout 180 -re {\r\n__BASELINE_STATUS__:([0-9]+)\r\n}
+        expect -timeout 180 -re {\r+\n__BASELINE_STATUS__:([0-9]+)\r+\n}
         if {$expect_out(1,string) ne "0"} {
             puts "\nError: native baseline checks failed"
             exit 1

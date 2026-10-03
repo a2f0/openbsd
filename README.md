@@ -10,7 +10,7 @@ Install [uv](https://docs.astral.sh/uv/) version **0.12.22**, then run:
 
 ```sh
 make deps
-make lint syntax
+make lint syntax test
 ```
 
 Python **3.14.8** from `.python-version` runs on the controller only, for the
@@ -22,8 +22,10 @@ CI actions are pinned to commit SHAs. OS tools come from the selected release's
 repositories so security updates remain available.
 
 `make lint` checks Expect syntax, formatting, and shell scripts; `make syntax`
-checks shell parsing. Run `make format` to format Expect files. To update tools,
-change the exact versions, run `uv lock`, then rerun `make deps lint syntax`.
+checks shell parsing. `make test` checks deployment's authentication and transfer
+failure handling against inherited SSH options. Run `make format` to format
+Expect files. To update tools, change the exact versions, run `uv lock`, then
+rerun `make deps lint syntax test`.
 
 ## QEMU
 
@@ -85,8 +87,9 @@ Leave `./boot.exp` running and use another terminal:
 
 For another host, use `user@host` and its port. `--known-hosts /path/to/file`
 selects a verified host-key file. SSH configuration still supplies proxy settings.
-Every connection uses strict host verification, key-only authentication, and no
-connection sharing; `-i` also selects `IdentitiesOnly=yes` to avoid exhausting the
+Every connection uses strict host verification and no connection sharing or
+backgrounding. The helper checks the actual public-key authentication method
+before deployment and afterward; `-i` selects `IdentitiesOnly=yes` to avoid exhausting the
 authentication limit with a large agent. The helper proves access before copying
 files, stages a private temporary directory, invokes `doas` with a terminal for
 its password prompt, checks a new SSH login afterward, and removes staging files.

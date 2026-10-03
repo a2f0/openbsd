@@ -31,11 +31,13 @@ source_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 set -- -o BatchMode=yes -o PreferredAuthentications=publickey \
     -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
     -o StrictHostKeyChecking=yes -o ControlMaster=no -o ControlPersist=no \
-    -o ControlPath=none -o ConnectTimeout=10 -S none -p "$port"
+    -o ControlPath=none -o ConnectTimeout=10 -o ForkAfterAuthentication=no \
+    -o StdinNull=no -o RequestTTY=no -S none -p "$port"
 if [ -n "$identity" ]; then set -- "$@" -i "$identity" -o IdentitiesOnly=yes; fi
 if [ -n "$known_hosts" ]; then set -- "$@" -o "UserKnownHostsFile=$known_hosts"; fi
 remote=
 archive=
+auth_log=
 cleanup() {
     result=$?
     trap - 0 HUP INT TERM
@@ -43,12 +45,25 @@ cleanup() {
     # shellcheck disable=SC2029
     if [ -n "$remote" ]; then ssh "$@" "$target" "rm -r '$remote'" || :; fi
     if [ -n "$archive" ]; then rm "$archive"; fi
+    if [ -n "$auth_log" ]; then rm "$auth_log"; fi
     exit "$result"
 }
 # Save the SSH arguments in the trap call without evaluating shell text.
 trap 'cleanup "$@"' 0
 trap 'exit 1' HUP INT TERM
-[ "$(ssh "$@" "$target" uname -s)" = OpenBSD ] || { echo "Target must be OpenBSD" >&2; exit 1; }
+prove_key() {
+    : > "$auth_log"
+    system=$(ssh "$@" -v -E "$auth_log" "$target" uname -s)
+    [ "$system" = OpenBSD ] || { echo "Target must be OpenBSD" >&2; exit 1; }
+    # OpenSSH probes authentication method "none" even with publickey preferred.
+    # A successful command on a passwordless account is not proof of a key login.
+    grep -Eq '^Authenticated to .* using "publickey"\.$' "$auth_log" || {
+        echo "SSH did not authenticate with a public key" >&2
+        exit 1
+    }
+}
+auth_log=$(mktemp)
+prove_key "$@"
 remote_uid=$(ssh "$@" "$target" id -u)
 case "$remote_uid" in ''|0|*[!0-9]*) echo "Use a non-root SSH account" >&2; exit 1 ;; esac
 context=$(ssh "$@" "$target" 'set -- $SSH_CONNECTION; printf "user=%s,host=%s,addr=%s,laddr=%s,lport=%s" "$(id -un)" "$1" "$1" "$3" "$4"')
@@ -63,5 +78,5 @@ tar -C "$source_dir" -cf "$archive" baseline
 ssh "$@" "$target" "tar -xpf - -C '$remote'" < "$archive"
 # A TTY lets doas prompt for the user's password. SSH itself remains key-only.
 ssh "$@" -tt "$target" "doas /bin/sh '$remote/baseline/baseline.sh' $mode --ssh-context '$context'"
-ssh "$@" "$target" uname -sr
+prove_key "$@"
 printf '%s\n' 'Fresh SSH key login passed'

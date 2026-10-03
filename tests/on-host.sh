@@ -13,7 +13,12 @@ context=user=a2f0,host=10.0.2.2,addr=10.0.2.2,laddr=10.0.2.15,lport=22
 set -- /usr/local/bin/python*
 [ ! -e "$1" ] || { echo "Unexpected target Python" >&2; exit 1; }
 work=$(mktemp -d /tmp/native-smoke.XXXXXXXXXX)
-trap 'rm -r "$work"' 0
+restore_ssh=0
+cleanup() {
+    if [ "$restore_ssh" -eq 1 ]; then cp -p "$work/ssh.saved" /etc/ssh/sshd_config; fi
+    rm -r "$work"
+}
+trap cleanup 0
 trap 'exit 1' HUP INT TERM
 pkg_info -q > "$work/packages.before"
 snapshot() {
@@ -44,7 +49,14 @@ snapshot > "$work/after"
 cmp "$work/before" "$work/after"
 cp "$repo/baseline/sshd.conf" "$work/bad/sshd.conf"
 printf '%s\n' 'net.inet.ip.nonexistent_baseline_key=0' >> "$work/bad/sysctl.conf"
-if sh "$work/bad/baseline.sh" apply; then echo "Unknown sysctl accepted" >&2; exit 1; fi
+if sh "$work/bad/baseline.sh" apply > "$work/unknown.log" 2>&1; then
+    echo "Unknown sysctl accepted" >&2; exit 1
+fi
+cat "$work/unknown.log"
+grep -qx 'Unknown sysctl: net.inet.ip.nonexistent_baseline_key' "$work/unknown.log"
+if grep -q 'Application failed' "$work/unknown.log"; then
+    echo "Unknown sysctl reached the mutation phase" >&2; exit 1
+fi
 snapshot > "$work/after"
 cmp "$work/before" "$work/after"
 
@@ -63,6 +75,32 @@ sh "$baseline" verify --ssh-context "$context"
 sh "$baseline" apply --ssh-context "$context" > "$work/repeat"
 cat "$work/repeat"
 grep -qx 'apply: changed=0' "$work/repeat"
+
+# Replace a legacy Ansible block without losing the surrounding configuration.
+cp -p /etc/ssh/sshd_config "$work/ssh.saved"
+restore_ssh=1
+{
+    printf '%s\n' '# BEGIN ANSIBLE OPENBSD BASELINE'
+    cat "$repo/baseline/sshd.conf"
+    printf '%s\n' '# END ANSIBLE OPENBSD BASELINE'
+    cat "$work/ssh.saved"
+} > /etc/ssh/sshd_config
+sh "$baseline" apply --ssh-context "$context"
+cmp "$work/ssh.saved" /etc/ssh/sshd_config
+
+# Mismatched marker kinds and conflicting Match policies must fail closed.
+printf '%s\n' '# BEGIN ANSIBLE OPENBSD BASELINE' '# END NATIVE OPENBSD BASELINE' >> /etc/ssh/sshd_config
+cp /etc/ssh/sshd_config "$work/malformed"
+if sh "$baseline" check; then echo "Malformed markers accepted" >&2; exit 1; fi
+cmp "$work/malformed" /etc/ssh/sshd_config
+cp -p "$work/ssh.saved" /etc/ssh/sshd_config
+printf '%s\n' 'Match User a2f0' '    PasswordAuthentication yes' >> /etc/ssh/sshd_config
+cp /etc/ssh/sshd_config "$work/match"
+if sh "$baseline" check --ssh-context "$context"; then echo "Conflicting Match policy accepted" >&2; exit 1; fi
+cmp "$work/match" /etc/ssh/sshd_config
+cp -p "$work/ssh.saved" /etc/ssh/sshd_config
+restore_ssh=0
+sh "$baseline" verify --ssh-context "$context"
 pkg_info -q > "$work/packages.after"
 cmp "$work/packages.before" "$work/packages.after"
 printf '%s\n' 'Native baseline regressions passed; no packages installed'

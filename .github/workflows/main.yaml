@@ -20,7 +20,7 @@ jobs:
       - name: Install locked dependencies
         run: make deps
       - name: Lint Expect and shell scripts
-        run: make lint syntax
+        run: make lint syntax test
 
   check:
     needs: lint
