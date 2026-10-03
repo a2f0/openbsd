@@ -87,8 +87,11 @@ uv run --locked ansible-playbook ansible/harden.yml -K --check --diff
 uv run --locked ansible-playbook ansible/harden.yml -K --diff
 ```
 
-Add `--private-key /path/to/key` if SSH cannot discover your key. For a fresh VM
-without a doas rule, add `-e ansible_become_method=ansible.builtin.su` to each
+Add `--private-key /path/to/key` if SSH cannot discover your key. If your SSH
+agent holds several keys, also use `--ssh-extra-args='-o IdentitiesOnly=yes'`
+to select that identity and avoid exhausting the hardened authentication limit.
+For a fresh VM without a doas rule, add
+`-e ansible_become_method=ansible.builtin.su` to each
 command and provide the **root** password at the `-K` prompt. Bootstrap Python
 before the hardening dry run; bootstrap in check mode does not install packages.
 

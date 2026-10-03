@@ -16,24 +16,31 @@
     openbsd_baseline_original_ssh_args: >-
       {{ lookup('ansible.builtin.config', 'ssh_args',
                 plugin_type='connection', plugin_name='ssh') }}
+    openbsd_baseline_original_ssh_extra_args: >-
+      {{ lookup('ansible.builtin.config', 'ssh_extra_args',
+                plugin_type='connection', plugin_name='ssh') | default('', true) }}
 
 # CLI passwords are stored outside host variables. Prove that the key works
 # over a separate connection before disabling any existing login method.
 # Put these options first: OpenSSH uses the first value, and ControlPath=none
 # prevents an existing password-authenticated master from satisfying the probe.
+# A final SSH-only -S none also overrides any later short socket options; keep
+# it out of shared ssh_args because SFTP/SCP give -S a different meaning.
 - name: Require an independent SSH key login before changing authentication
   vars:
     ansible_ssh_args: >-
       -o BatchMode=yes -o PreferredAuthentications=publickey
       -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no
       -o ControlPath=none {{ openbsd_baseline_original_ssh_args }}
+    ansible_ssh_extra_args: "{{ openbsd_baseline_original_ssh_extra_args }} -S none"
   block:
     - name: Require key probe options to precede user SSH overrides
       ansible.builtin.assert:
         that: >-
           ansible_ssh_args.startswith('-o BatchMode=yes -o PreferredAuthentications=publickey '
           '-o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ControlPath=none ')
-        fail_msg: Remove ansible_ssh_args extra-vars overrides so the key login probe can run safely.
+          and ansible_ssh_extra_args.endswith(' -S none')
+        fail_msg: Remove SSH argument extra-vars overrides so the key login probe can run safely.
 
     - name: Verify independent SSH key authentication
       ansible.builtin.ping:
