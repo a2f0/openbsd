@@ -43,7 +43,7 @@ command=$previous
 printf '%s\n' "$command" >> "$TEST_WORK/commands"
 case "$command" in
     -s)
-        printf 'Authenticated to fixture using "%s".\n' "$TEST_METHOD" >> "$log"
+        printf 'Authenticated to fixture using "%s".\r\n' "$TEST_METHOD" >> "$log"
         echo OpenBSD ;;
     -u) echo 1000 ;;
     *SSH_CONNECTION*) echo 'user=admin,host=192.0.2.1,addr=192.0.2.1,laddr=192.0.2.2,lport=22' ;;

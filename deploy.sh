@@ -57,7 +57,8 @@ prove_key() {
     [ "$system" = OpenBSD ] || { echo "Target must be OpenBSD" >&2; exit 1; }
     # OpenSSH probes authentication method "none" even with publickey preferred.
     # A successful command on a passwordless account is not proof of a key login.
-    grep -Eq '^Authenticated to .* using "publickey"\.$' "$auth_log" || {
+    # OpenSSH logs may use CRLF even when -E writes to a regular file.
+    tr -d '\r' < "$auth_log" | grep -Eq '^Authenticated to .* using "publickey"\.$' || {
         echo "SSH did not authenticate with a public key" >&2
         exit 1
     }
