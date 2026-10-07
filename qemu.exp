@@ -55,7 +55,7 @@ if {[info exists env(SSH_PUBLIC_KEY)] && [regexp {[\r\n]} $env(SSH_PUBLIC_KEY)]}
 
 # Fetch metadata to stdout: preview creates no files and starts no processes
 # beyond this read-only HTTPS request. Bind verification to the selected ISO.
-if {[catch {exec wget -q -O - "$RELEASE_URL/SHA256"} manifest]} {
+if {[catch {exec wget --no-config --no-hsts -q -O - "$RELEASE_URL/SHA256"} manifest]} {
     puts "Error: could not read the release checksum manifest: $manifest"
     exit 1
 }
@@ -185,7 +185,7 @@ proc download_file {url filename} {
     puts "Attempting to download $filename from $url"
 
     # Try wget
-    set wget_result [catch {exec wget -q -O $filename $url} wget_output]
+    set wget_result [catch {exec wget --no-config --no-hsts -q -O $filename $url} wget_output]
     if {$wget_result == 0} {
         puts "Download completed successfully using wget"
         return 1

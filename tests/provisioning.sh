@@ -12,7 +12,7 @@ export PROVISION_TEST_WORK
 cat > "$work/bin/wget" <<'WGET'
 #!/bin/sh
 set -eu
-[ "$*" = '-q -O - https://cdn.openbsd.org/pub/OpenBSD/7.9/amd64/SHA256' ] || exit 90
+[ "$*" = '--no-config --no-hsts -q -O - https://cdn.openbsd.org/pub/OpenBSD/7.9/amd64/SHA256' ] || exit 90
 if [ "${PROVISION_TEST_FETCH_FAILURE:-0}" -eq 1 ]; then exit 98; fi
 cat "$PROVISION_TEST_WORK/manifest"
 WGET

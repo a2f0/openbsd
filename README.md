@@ -53,6 +53,8 @@ The installer always previews its selected release, ISO checksum, disk, and QEMU
 commands before creating anything. `--dry-run` performs that preflight without
 creating files or starting a VM; it reads the release checksum over HTTPS and
 rejects an existing disk or `install.conf`, including symlinks. Installation
+disables wget's user configuration and HSTS cache for these requests so preview
+cannot create a cache file or inherit download side effects. It
 checks the selected ISO against that checksum before creating the fresh disk.
 An interrupted download or mismatched cached ISO fails the preview and remains
 untouched; inspect it and move it aside before retrying the download.
