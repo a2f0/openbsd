@@ -107,9 +107,9 @@ spawn qemu-system-x86_64 \
     -smp cpus=2 \
     -nographic \
     -serial mon:stdio \
-    -hda openbsd-vm.qcow2 \
-    -net nic,model=e1000 \
-    -net user,hostfwd=tcp:127.0.0.1:2222-:22 \
+    -drive file=openbsd-vm.qcow2,format=qcow2,if=ide,index=0 \
+    -device e1000,netdev=ssh \
+    -netdev user,id=ssh,hostfwd=tcp:127.0.0.1:2222-:22 \
     -boot c
 set VM_RUNNING 1
 
