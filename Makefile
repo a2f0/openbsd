@@ -1,4 +1,4 @@
-.PHONY: deps lint format syntax test
+.PHONY: deps lint format syntax test test-provisioning
 
 deps:
 	uv sync --locked
@@ -16,6 +16,11 @@ syntax:
 	sh -n deploy.sh
 	sh -n tests/on-host.sh
 	sh -n tests/controller.sh
+	sh -n tests/provisioning.sh
 
 test:
 	sh tests/controller.sh
+
+# Requires the controller's Expect executable; all external effects are mocked.
+test-provisioning:
+	sh tests/provisioning.sh

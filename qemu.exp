@@ -1,6 +1,42 @@
 #!/usr/bin/expect -f
 
 set INSTALL_CONF_CREATED 0
+set DRY_RUN 0
+if {$argc == 1 && [lindex $argv 0] eq "--dry-run"} {
+    set DRY_RUN 1
+} elseif {$argc != 0} {
+    puts "Usage: $argv0 \[--dry-run\]"
+    exit 1
+}
+
+set OPENBSD_VERSION "7.9"
+set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
+set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
+set DISK_FILE "openbsd-vm.qcow2"
+set RELEASE_URL "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64"
+
+# Run the same read-only preflight before preview and installation. Never
+# overwrite a user's disk or installer response file, including dangling links.
+foreach target [list $DISK_FILE install.conf] {
+    if {![catch {file lstat $target target_info}]} {
+        puts "Error: '$target' already exists."
+        exit 1
+    }
+}
+foreach command {uv wget qemu-img qemu-system-x86_64} {
+    if {[auto_execok $command] eq ""} {
+        puts "Error: required controller tool '$command' is missing."
+        exit 1
+    }
+}
+set checksum_command [auto_execok sha256sum]
+if {$checksum_command eq ""} {
+    set checksum_command [auto_execok gsha256sum]
+}
+if {$checksum_command eq ""} {
+    puts "Error: install GNU coreutils for sha256sum or gsha256sum."
+    exit 1
+}
 
 foreach required_var {USER_PASSWORD ROOT_PASSWORD} {
     if {![info exists env($required_var)] || $env($required_var) eq ""} {
@@ -11,6 +47,62 @@ foreach required_var {USER_PASSWORD ROOT_PASSWORD} {
         puts "Error: $required_var must not contain newlines."
         exit 1
     }
+}
+if {[info exists env(SSH_PUBLIC_KEY)] && [regexp {[\r\n]} $env(SSH_PUBLIC_KEY)]} {
+    puts "Error: SSH_PUBLIC_KEY must not contain newlines."
+    exit 1
+}
+
+# Fetch metadata to stdout: preview creates no files and starts no processes
+# beyond this read-only HTTPS request. Bind verification to the selected ISO.
+if {[catch {exec wget -q -O - "$RELEASE_URL/SHA256"} manifest]} {
+    puts "Error: could not read the release checksum manifest: $manifest"
+    exit 1
+}
+set expected_checksum ""
+foreach line [split $manifest "\n"] {
+    if {
+        [regexp {^SHA256 \(([^)]+)\) = ([0-9a-f]{64})$} $line -> filename checksum] &&
+        $filename eq $ISO_FILE
+    } {
+        if {$expected_checksum ne ""} {
+            puts "Error: duplicate ISO checksums in release manifest."
+            exit 1
+        }
+        set expected_checksum $checksum
+    }
+}
+if {$expected_checksum eq ""} {
+    puts "Error: selected ISO has no release checksum."
+    exit 1
+}
+if {![catch {file lstat $ISO_FILE iso_info}]} {
+    if {$iso_info(type) ne "file"} {
+        puts "Error: '$ISO_FILE' must be a regular file."
+        exit 1
+    }
+    if {
+        [catch {exec {*}$checksum_command $ISO_FILE} cached_checksum] ||
+        [lindex $cached_checksum 0] ne $expected_checksum
+    } {
+        puts "Error: cached ISO checksum differs from the selected release."
+        exit 1
+    }
+}
+
+set create_command [list qemu-img create -f qcow2 $DISK_FILE 5G]
+set install_command [list qemu-system-x86_64 -m 4096 -smp cpus=2 -nographic \
+    -drive file=$ISO_FILE,format=raw,if=ide,index=2,media=cdrom,readonly=on \
+    -drive file=$DISK_FILE,format=qcow2,if=ide,index=0 \
+    -device e1000,netdev=installer -netdev user,id=installer -boot c]
+puts "Preview: OpenBSD $OPENBSD_VERSION/amd64 in [file normalize .]"
+puts "ISO: $RELEASE_URL/$ISO_FILE SHA256=$expected_checksum"
+puts "Plan: verify/download ISO; create private install.conf; serve on 127.0.0.1:8686"
+puts "Plan: $create_command"
+puts "Plan: $install_command; install on fresh sd0; power down; remove install.conf"
+if {$DRY_RUN} {
+    puts "Dry run passed: no files created, no VM started."
+    exit 0
 }
 
 # Function to generate install.conf with environment variable interpolation
@@ -42,7 +134,7 @@ Continue without verification? = yes
 Set name(s) = -game* -x* -comp*"
 
     # Write the content to install.conf
-    set file [open "install.conf" {WRONLY CREAT TRUNC} 0600]
+    set file [open "install.conf" {WRONLY CREAT EXCL} 0600]
     set ::INSTALL_CONF_CREATED 1
     file attributes "install.conf" -permissions 0600
     puts $file $conf_content
@@ -104,30 +196,9 @@ proc download_file {url filename} {
     return 0
 }
 
-set OPENBSD_VERSION "7.9"
-set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
-set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
-set SHA256_FILE "SHA256"
-set DISK_FILE "openbsd-vm.qcow2"
-
-if {![file exists $SHA256_FILE]} {
-    puts "ISO file not found: $SHA256_FILE"
-    set download_url "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/SHA256"
-
-    if {[download_file $download_url $SHA256_FILE]} {
-        puts "Download completed: $SHA256_FILE"
-    } else {
-        puts "Failed to download SHA256 file."
-        cleanup
-        exit 1
-    }
-} else {
-    puts "SHA256 file already exists: $SHA256_FILE"
-}
-
 if {![file exists $ISO_FILE]} {
     puts "ISO file not found: $ISO_FILE"
-    set download_url "https://cdn.openbsd.org/pub/OpenBSD/$OPENBSD_VERSION/amd64/$ISO_FILE"
+    set download_url "$RELEASE_URL/$ISO_FILE"
 
     if {[download_file $download_url $ISO_FILE]} {
         puts "Download completed: $ISO_FILE"
@@ -142,16 +213,8 @@ if {![file exists $ISO_FILE]} {
 
 # Verify SHA256 checksums
 puts "Verifying SHA256 checksums..."
-set checksum_command [auto_execok sha256sum]
-if {$checksum_command eq ""} {
-    set checksum_command [auto_execok gsha256sum]
-}
-if {$checksum_command eq ""} {
-    puts "Error: install GNU coreutils for sha256sum or gsha256sum."
-    exit 1
-}
-set sha256_result [catch {exec {*}$checksum_command -c SHA256 --ignore-missing} sha256_output]
-if {$sha256_result != 0} {
+set sha256_result [catch {exec {*}$checksum_command $ISO_FILE} sha256_output]
+if {$sha256_result != 0 || [lindex $sha256_output 0] ne $expected_checksum} {
     puts "Error: SHA256 verification failed: $sha256_output"
     cleanup
     exit 1
@@ -167,17 +230,11 @@ if {[file exists $DISK_FILE]} {
 generate_install_conf
 
 puts "Creating virtual disk image..."
-exec qemu-img create -f qcow2 $DISK_FILE 5G
+exec {*}$create_command
 
 puts "Starting QEMU with host access through 10.0.2.2"
 
-spawn qemu-system-x86_64 \
-    -m 4096 \
-    -smp cpus=2 \
-    -nographic \
-    -cdrom $ISO_FILE \
-    -hda $DISK_FILE \
-    -boot c
+spawn {*}$install_command
 
 # Fail if any expect below times out or QEMU exits, instead of carrying on
 expect_after {

@@ -6,7 +6,7 @@ The baseline installs **no packages and no Python on the OpenBSD host**.
 
 ## Dependencies and linting
 
-Install [uv](https://docs.astral.sh/uv/) version **0.12.22**, then run:
+Install [uv](https://docs.astral.sh/uv/) version **0.12.23**, then run:
 
 ```sh
 make deps
@@ -38,6 +38,7 @@ needs an approximately 800 MB ISO and creates a 5 GB virtual disk.
 Set `USER_PASSWORD` and `ROOT_PASSWORD`, then run:
 
 ```sh
+./qemu.exp --dry-run
 ./qemu.exp
 ./boot.exp
 ```
@@ -47,6 +48,19 @@ otherwise the existing default public key is used. SSH is forwarded at
 `a2f0@127.0.0.1:2222`. The password-bearing `install.conf` has mode `0600`, is
 served on controller loopback, and is removed on exit. The forwarded SSH listener
 also binds to loopback.
+
+The installer always previews its selected release, ISO checksum, disk, and QEMU
+commands before creating anything. `--dry-run` performs that preflight without
+creating files or starting a VM; it reads the release checksum over HTTPS and
+rejects an existing disk or `install.conf`, including symlinks. Installation
+checks the selected ISO against that checksum before creating the fresh disk.
+This checks integrity from the HTTPS release source; independent signature
+verification requires [signify](https://www.openbsd.org/faq/faq4.html#Download).
+Explicit QEMU drive formats and network devices preserve the IDE disk and
+e1000 adapter without relying on legacy option defaults.
+After installing Expect, `make test-provisioning` checks the preview's refusal
+to overwrite existing artifacts or accept missing/mismatched ISO checksums,
+using mocked controller commands without starting a VM.
 
 `./boot.exp --check` tests console and SSH logins, then powers off the VM.
 It requires `USER_PASSWORD`; `SSH_IDENTITY_FILE` selects a private key. The SSH
