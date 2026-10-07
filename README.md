@@ -54,6 +54,8 @@ commands before creating anything. `--dry-run` performs that preflight without
 creating files or starting a VM; it reads the release checksum over HTTPS and
 rejects an existing disk or `install.conf`, including symlinks. Installation
 checks the selected ISO against that checksum before creating the fresh disk.
+An interrupted download or mismatched cached ISO fails the preview and remains
+untouched; inspect it and move it aside before retrying the download.
 This checks integrity from the HTTPS release source; independent signature
 verification requires [signify](https://www.openbsd.org/faq/faq4.html#Download).
 Explicit QEMU drive formats and network devices preserve the IDE disk and
