@@ -221,7 +221,7 @@ if {$sha256_result != 0 || [lindex $sha256_output 0] ne $expected_checksum} {
 }
 puts "SHA256 verification completed successfully"
 
-if {[file exists $DISK_FILE]} {
+if {![catch {file lstat $DISK_FILE target_info}]} {
     puts "Error: Virtual disk '$DISK_FILE' already exists."
     cleanup
     exit 1

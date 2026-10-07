@@ -37,30 +37,37 @@ expect "$repo/qemu.exp" --dry-run > "$work/result"
 grep -q 'Dry run passed: no files created, no VM started.' "$work/result"
 [ -z "$(ls -A)" ]
 reject() {
+    expected=$1
+    shift
     if expect "$repo/qemu.exp" "$@" > "$work/result" 2>&1; then
         echo 'Unsafe provisioning preview was accepted' >&2; exit 1
     fi
+    grep -Fxq "$expected" "$work/result" || { cat "$work/result"; exit 1; }
 }
 printf 'keep\n' > openbsd-vm.qcow2
-reject --dry-run
-reject
+reject "Error: 'openbsd-vm.qcow2' already exists." --dry-run
+reject "Error: 'openbsd-vm.qcow2' already exists."
 [ "$(cat openbsd-vm.qcow2)" = keep ]
 rm openbsd-vm.qcow2
 ln -s absent openbsd-vm.qcow2
-reject --dry-run
+reject "Error: 'openbsd-vm.qcow2' already exists." --dry-run
 rm openbsd-vm.qcow2
 printf 'private\n' > install.conf
-reject --dry-run
+reject "Error: 'install.conf' already exists." --dry-run
 [ "$(cat install.conf)" = private ]
 rm install.conf
 printf 'SHA256 (other.iso) = %s\n' "$checksum" > "$work/manifest"
-reject --dry-run
+reject 'Error: selected ISO has no release checksum.' --dry-run
 printf 'SHA256 (install79.iso) = %s\n' "$checksum" > "$work/manifest"
 printf 'SHA256 (install79.iso) = %s\n' "$checksum" >> "$work/manifest"
-reject --dry-run
+reject 'Error: duplicate ISO checksums in release manifest.' --dry-run
 printf 'SHA256 (install79.iso) = %064d\n' 1 > "$work/manifest"
 printf 'existing iso\n' > install79.iso
-reject --dry-run
+reject 'Error: cached ISO checksum differs from the selected release.' --dry-run
+[ "$(cat install79.iso)" = 'existing iso' ]
+printf 'SHA256 (install79.iso) = %s\n' "$checksum" > "$work/manifest"
+expect "$repo/qemu.exp" --dry-run > "$work/result"
+grep -q 'Dry run passed: no files created, no VM started.' "$work/result"
 [ "$(cat install79.iso)" = 'existing iso' ]
 rm install79.iso
 printf '%s\n' 'Provisioning preview regressions passed'
