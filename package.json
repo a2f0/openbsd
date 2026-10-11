@@ -1,0 +1,18 @@
+{
+  "name": "openbsd-agent-tools",
+  "private": true,
+  "description": "Controller-only agent workflow tooling for OpenBSD automation",
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "bun": ">=1.4.2"
+  },
+  "scripts": {
+    "agent-tool": "agent-tool",
+    "agent:run": "agent-tool run",
+    "agents:sync": "bun run agent-tool skills install --apply",
+    "agents:check": "bun run agent-tool skills check"
+  },
+  "devDependencies": {
+    "@a2f0/agent-tool": "0.1.11"
+  }
+}
