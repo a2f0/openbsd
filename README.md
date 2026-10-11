@@ -27,6 +27,34 @@ failure handling against inherited SSH options. Run `make format` to format
 Expect files. To update tools, change the exact versions, run `uv lock`, then
 rerun `make deps lint syntax test`.
 
+## Agent workflow tooling
+
+[AGENTS.md](AGENTS.md) contains repository guidance for coding agents. Install
+**Bun 1.4.2** on the controller, then install the exact agent-tool dependency:
+
+```sh
+bun install --frozen-lockfile
+bun run agents:check
+bun run agent:run --label setup -- make deps
+bun run agent:run --label checks -- make lint syntax test test-provisioning
+```
+
+The last command needs the controller's Expect executable as described below;
+its provisioning tests mock external effects and never start a VM. The harness
+keeps complete output in a private local log and returns a compact receipt with
+the original exit status and a bounded failure excerpt. Inspect more with
+`bun run agent-tool logs <log-path>` or a targeted search, including any required
+warnings or timing evidence. Keep reviews and other decision output visible, and
+run interactive tools and persistent servers directly. The normal Make targets
+and CI retain their full output.
+
+Agent tooling runs only on the controller. It installs no OpenBSD host packages.
+When updating the exact `@a2f0/agent-tool` pin, run `bun run agents:sync` and
+commit bun.lock, `.agent-tool-skills.json`, and both generated skill directories.
+CI checks their consistency in the existing `lint` job. The shared `ship-pr`
+workflow uses `agent-tool.json` to require workflow `main`'s `lint` and `check`
+jobs before merging an independently reviewed commit.
+
 ## QEMU
 
 Install Expect, QEMU, wget, and GNU coreutils on the controller (Ubuntu:

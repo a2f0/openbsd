@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "subject": {
+    "conventional": true
+  },
+  "merge": {
+    "requiredChecks": [
+      { "name": "lint", "workflow": "main" },
+      { "name": "check", "workflow": "main" }
+    ]
+  }
+}
