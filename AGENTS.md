@@ -40,3 +40,12 @@ review of the committed HEAD. `agent-tool.json` requires both `lint` and `check`
 from workflow `main`; wait for every push and pull-request check to finish.
 There is no package release or deployment workflow. Do not change repository
 protection settings as part of routine shipping.
+
+## Dependency documentation
+
+Read [dependency maintenance](docs/dependency-upgrades.md) before upgrades.
+Keep reusable procedures and active constraints there, updating entries in place
+and removing resolved ones. Keep run-specific versions, audits, validation,
+previews, and skipped-group evidence in the upgrade PR. The top-level README
+needs only setup, normal usage, and a short maintenance link; do not append
+upgrade reports or duplicate agent instructions there.
