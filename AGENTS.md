@@ -6,7 +6,7 @@ preserve unrelated edits, and use Conventional Commits.
 
 ## Setup and validation
 
-Controller tools are pinned: Bun 1.4.2, uv 0.12.23, and Python 3.14.8 from
+Controller tools are pinned: Bun 1.4.3, uv 0.13.1, and Python 3.15.0 from
 `.python-version`. Install agent tooling with `bun install --frozen-lockfile`,
 then run `make deps`. These are controller-only dependencies; the OpenBSD host
 uses base tools and must not gain packages or Python from this workflow.
