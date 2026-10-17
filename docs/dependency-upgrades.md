@@ -22,6 +22,16 @@ Agent-tool is controller-only too. Follow the
 [managed skill update procedure](../AGENTS.md#shared-skills-and-shipping) when
 changing its exact pin. CI action references remain pinned to commit SHAs.
 
+## Tcl tooling constraints
+
+[tclint's published metadata](https://pypi.org/pypi/tclint/0.9.0/json)
+pins its parser and language-server dependencies exactly. Keep importlib-metadata,
+pathspec, pygls, and voluptuous within those pins even when newer releases exist;
+pygls also constrains lsprotocol. Revisit them with a supported tclint release,
+regenerate the lockfile, and run the full controller validation above instead of
+overriding the linter's internal dependencies. Check each resolved package's
+Python requirements when changing the controller interpreter.
+
 ## Keeping the record current
 
 Record each upgrade's selected versions, audits, validation, warnings, previews,

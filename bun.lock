@@ -5,11 +5,13 @@
     "": {
       "name": "openbsd-agent-tools",
       "devDependencies": {
-        "@a2f0/agent-tool": "0.1.11",
+        "@a2f0/agent-tool": "0.1.14",
       },
     },
   },
   "packages": {
-    "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.11", "", { "bin": { "agent-tool": "src/index.ts" } }, "sha512-eRAHiNz+sujqHS+nyCWcKBQKGqU9tlm0iCvm6CghZ5+KjSWCjWKJQgeq3pd6Ax45amSltFToryR/m68T0XMnIg=="],
+    "@a2f0/agent-tool": ["@a2f0/agent-tool@0.1.14", "", { "dependencies": { "@resvg/resvg-wasm": "2.6.2" }, "bin": { "agent-tool": "src/index.ts" } }, "sha512-CLUvDoUC7lxnHU8n78Xw9guVrOB0lBtEv3hA9uS2BL4/6IPhHzL1HEgCi/O4rBXhoQaHyJKHObeA9JSOv2IpGg=="],
+
+    "@resvg/resvg-wasm": ["@resvg/resvg-wasm@2.6.2", "", {}, "sha512-FqALmHI8D4o6lk/LRWDnhw95z5eO+eAa6ORjVg09YRR7BkcM6oPHU9uyC0gtQG5vpFLvgpeU4+zEAz2H8APHNw=="],
   }
 }

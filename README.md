@@ -6,14 +6,14 @@ The baseline installs **no packages and no Python on the OpenBSD host**.
 
 ## Dependencies and linting
 
-Install [uv](https://docs.astral.sh/uv/) version **0.12.23**, then run:
+Install [uv](https://docs.astral.sh/uv/) version **0.13.1**, then run:
 
 ```sh
 make deps
 make lint syntax test
 ```
 
-Python **3.14.8** from `.python-version` runs on the controller only, for the
+Python **3.15.0** from `.python-version` runs on the controller only, for the
 installer's local HTTP server and development tools. Exact tool versions are
 in `pyproject.toml`; `uv.lock` pins their transitive dependencies and hashes.
 Expect linting uses `tclint==0.9.0`; shell linting uses the bundled ShellCheck
