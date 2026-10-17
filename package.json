@@ -13,6 +13,6 @@
     "agents:check": "bun run agent-tool skills check"
   },
   "devDependencies": {
-    "@a2f0/agent-tool": "0.1.14"
+    "@a2f0/agent-tool": "0.1.15"
   }
 }
