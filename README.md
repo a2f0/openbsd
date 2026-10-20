@@ -6,9 +6,13 @@ The baseline installs **no packages and no Python on the OpenBSD host**.
 
 ## Dependencies and linting
 
-Install [uv](https://docs.astral.sh/uv/) version **0.13.1**, then run:
+On the controller, [mise](https://mise.jdx.dev/) installs the Bun and
+[uv](https://docs.astral.sh/uv/) versions pinned in `.mise.toml`. CI uses the
+same pins:
 
 ```sh
+mise install
+bun install --frozen-lockfile
 make deps
 make lint syntax test
 ```
