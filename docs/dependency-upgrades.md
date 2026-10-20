@@ -11,6 +11,10 @@ change. Keep the controller Python selection in `.python-version`, its supported
 range in `pyproject.toml`, and CI aligned. Preserve exact development dependency
 pins and refresh `uv.lock` with the pinned uv version.
 
+Keep Bun and uv pinned in `.mise.toml`; CI installs those versions with mise.
+Keep `package.json`'s `packageManager` aligned with the Bun pin. Python packages
+remain managed by uv, and `.python-version` remains its interpreter selection.
+
 To update Python tools, change their exact versions, run `uv lock`, then
 `make deps lint syntax test test-provisioning`. Provisioning regression tests
 require Expect and mock external effects; they do not start a VM. Check OS tool

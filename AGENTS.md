@@ -6,8 +6,10 @@ preserve unrelated edits, and use Conventional Commits.
 
 ## Setup and validation
 
-Controller tools are pinned: Bun 1.4.3, uv 0.13.1, and Python 3.15.0 from
-`.python-version`. Install agent tooling with `bun install --frozen-lockfile`,
+Controller Bun and uv are pinned in `.mise.toml`; uv selects Python from
+`.python-version`. In agent shells, put the matching directories under
+`~/.local/share/mise/installs` first on `PATH` rather than running `mise trust`.
+Install agent tooling with `bun install --frozen-lockfile`,
 then run `make deps`. These are controller-only dependencies; the OpenBSD host
 uses base tools and must not gain packages or Python from this workflow.
 
