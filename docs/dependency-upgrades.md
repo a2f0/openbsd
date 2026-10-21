@@ -26,21 +26,22 @@ Agent-tool is controller-only too. Follow the
 [managed skill update procedure](../AGENTS.md#shared-skills-and-shipping) when
 changing its exact pin. CI action references remain pinned to commit SHAs.
 
-## Python distribution availability
+## Python distribution metadata
 
-The controller interpreter must be available through the pinned uv release on
-both macOS arm64 and Linux amd64. Python 3.15.1 is published upstream, but
-[uv 0.13.4](https://github.com/astral-sh/uv/releases/tag/0.13.4) only provides
-3.15.0 in its managed download catalog. Keep `.python-version` at 3.15.0 until
-`uv python list 3.15.1 --all-platforms --all-arches --all-versions` includes both
-platforms, then update the pin and README and repeat controller and QEMU CI.
-Do not substitute a local-only interpreter while CI still uses uv's catalog.
+Python 3.15.1 was published after uv 0.13.4's embedded download catalog. The
+`python-downloads-json-url` setting in `pyproject.toml` uses uv's
+[documented catalog override](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
+with official metadata pinned to an immutable upstream commit. It provides
+checksummed [Astral standalone builds](https://github.com/astral-sh/python-build-standalone/releases/tag/20261021)
+for the same interpreter on developer platforms and Linux CI, without a custom
+installer or global tool changes.
 
-Use uv 0.13.4 or later to address its
-[emSign CA advisory](https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62).
-The repository installs with uv and does not invoke Python's bundled pip; any
-separate use of pip must follow the
-[Python security release guidance](https://www.python.org/downloads/release/python-3151/).
+After upgrading uv, check its built-in catalog with
+`uv --no-config python list 3.15.1 --only-downloads --all-platforms --all-arches --all-versions`.
+Remove the override once the catalog includes macOS arm64 and Linux amd64, then
+repeat locked setup, controller validation, and QEMU CI. Until then, keep the
+metadata commit immutable and verify any replacement's download hashes against
+the corresponding official release.
 
 ## Tcl tooling constraints
 

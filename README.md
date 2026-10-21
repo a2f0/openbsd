@@ -17,7 +17,7 @@ make deps
 make lint syntax test
 ```
 
-Python **3.15.0** from `.python-version` runs on the controller only, for the
+Python **3.15.1** from `.python-version` runs on the controller only, for the
 installer's local HTTP server and development tools. Exact tool versions are
 in `pyproject.toml`; `uv.lock` pins their transitive dependencies and hashes.
 Expect linting uses `tclint==0.9.0`; shell linting uses the bundled ShellCheck
