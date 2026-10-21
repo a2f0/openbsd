@@ -31,7 +31,8 @@ changing its exact pin. CI action references remain pinned to commit SHAs.
 Python 3.15.1 was published after uv 0.13.4's embedded download catalog. The
 `python-downloads-json-url` setting in `pyproject.toml` uses uv's
 [documented catalog override](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
-with official metadata pinned to an immutable upstream commit. It provides
+with the official metadata from [uv PR #22802](https://github.com/astral-sh/uv/pull/22802),
+pinned to its immutable merge commit. It provides
 checksummed [Astral standalone builds](https://github.com/astral-sh/python-build-standalone/releases/tag/20261021)
 for the same interpreter on developer platforms and Linux CI, without a custom
 installer or global tool changes.

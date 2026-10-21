@@ -11,7 +11,7 @@ dev = ["tclint==0.9.0", "shellcheck-py==0.11.0.1"]
 [tool.uv]
 package = false
 default-groups = ["dev"]
-# New security patch published after uv 0.13.4; see docs/dependency-upgrades.md.
+# Python 3.15.1 security release is missing from uv 0.13.4's built-in catalog.
 python-downloads-json-url = "https://raw.githubusercontent.com/astral-sh/uv/a02d446bcddd8a00c98084709b6bdccbc9a8208f/crates/uv-python-managed/download-metadata.json"
 
 [tool.tclint]
