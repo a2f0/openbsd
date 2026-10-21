@@ -1,6 +1,6 @@
 # OpenBSD
 
-Provision an OpenBSD **7.9/amd64** VM and apply a small security baseline with
+Provision an OpenBSD **8.0/amd64** VM and apply a small security baseline with
 OpenBSD's base tools: `sh`, `ssh`, `doas`, `sysctl`, `install`, and `rcctl`.
 The baseline installs **no packages and no Python on the OpenBSD host**.
 
@@ -17,7 +17,7 @@ make deps
 make lint syntax test
 ```
 
-Python **3.15.0** from `.python-version` runs on the controller only, for the
+Python **3.15.1** from `.python-version` runs on the controller only, for the
 installer's local HTTP server and development tools. Exact tool versions are
 in `pyproject.toml`; `uv.lock` pins their transitive dependencies and hashes.
 Expect linting uses `tclint==0.9.0`; shell linting uses the bundled ShellCheck
@@ -159,8 +159,8 @@ remain separate from this baseline. Use `rcctl stop <service>` and
 with `doas syspatch` and schedule any required reboot; use `doas pkg_add -u` for
 installed packages. These maintenance commands are explicit operator actions.
 
-For initial installation, OpenBSD also supports native custom `site79.tgz` sets
-and `/install.site` hooks; see [install.site(5)](https://man.openbsd.org/OpenBSD-7.9/install.site.5).
+For initial installation, OpenBSD also supports native custom `site80.tgz` sets
+and `/install.site` hooks; see [install.site(5)](https://man.openbsd.org/OpenBSD-8.0/install.site.5).
 This repository applies the baseline after installation so it can prove SSH key
 access before disabling password login.
 

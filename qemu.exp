@@ -9,7 +9,7 @@ if {$argc == 1 && [lindex $argv 0] eq "--dry-run"} {
     exit 1
 }
 
-set OPENBSD_VERSION "7.9"
+set OPENBSD_VERSION "8.0"
 set OPENBSD_PERIOD_STRIPPED [regsub -all {\.} $OPENBSD_VERSION ""]
 set ISO_FILE "install$OPENBSD_PERIOD_STRIPPED.iso"
 set DISK_FILE "openbsd-vm.qcow2"

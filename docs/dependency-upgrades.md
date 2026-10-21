@@ -26,6 +26,24 @@ Agent-tool is controller-only too. Follow the
 [managed skill update procedure](../AGENTS.md#shared-skills-and-shipping) when
 changing its exact pin. CI action references remain pinned to commit SHAs.
 
+## Python distribution metadata
+
+Python 3.15.1 was published after uv 0.13.4's embedded download catalog. The
+`python-downloads-json-url` setting in `pyproject.toml` uses uv's
+[documented catalog override](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
+with the official metadata from [uv PR #22802](https://github.com/astral-sh/uv/pull/22802),
+pinned to its immutable merge commit. It provides
+checksummed [Astral standalone builds](https://github.com/astral-sh/python-build-standalone/releases/tag/20261021)
+for the same interpreter on developer platforms and Linux CI, without a custom
+installer or global tool changes.
+
+After upgrading uv, check its built-in catalog with
+`uv --no-config python list 3.15.1 --only-downloads --all-platforms --all-arches --all-versions`.
+Remove the override once the catalog includes macOS arm64 and Linux amd64, then
+repeat locked setup, controller validation, and QEMU CI. Until then, keep the
+metadata commit immutable and verify any replacement's download hashes against
+the corresponding official release.
+
 ## Tcl tooling constraints
 
 [tclint's published metadata](https://pypi.org/pypi/tclint/0.9.0/json)
