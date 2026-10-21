@@ -12,13 +12,13 @@ export PROVISION_TEST_WORK
 cat > "$work/bin/wget" <<'WGET'
 #!/bin/sh
 set -eu
-[ "$*" = '--no-config --no-hsts -q -O - https://cdn.openbsd.org/pub/OpenBSD/7.9/amd64/SHA256' ] || exit 90
+[ "$*" = '--no-config --no-hsts -q -O - https://cdn.openbsd.org/pub/OpenBSD/8.0/amd64/SHA256' ] || exit 90
 if [ "${PROVISION_TEST_FETCH_FAILURE:-0}" -eq 1 ]; then exit 98; fi
 cat "$PROVISION_TEST_WORK/manifest"
 WGET
 cat > "$work/bin/sha256sum" <<'CHECKSUM'
 #!/bin/sh
-echo '0000000000000000000000000000000000000000000000000000000000000000  install79.iso'
+echo '0000000000000000000000000000000000000000000000000000000000000000  install80.iso'
 CHECKSUM
 cat > "$work/bin/uv" <<'GUARD'
 #!/bin/sh
@@ -34,7 +34,7 @@ USER_PASSWORD=fixture ROOT_PASSWORD=fixture
 export USER_PASSWORD ROOT_PASSWORD
 cd "$work/run"
 checksum=0000000000000000000000000000000000000000000000000000000000000000
-printf 'SHA256 (install79.iso) = %s\n' "$checksum" > "$work/manifest"
+printf 'SHA256 (install80.iso) = %s\n' "$checksum" > "$work/manifest"
 "$EXPECT" "$repo/qemu.exp" --dry-run > "$work/result"
 grep -q 'Dry run passed: no files created, no VM started.' "$work/result"
 [ -z "$(ls -A)" ]
@@ -74,22 +74,22 @@ key' reject 'Error: SSH_PUBLIC_KEY must not contain newlines.' --dry-run
 unset SSH_PUBLIC_KEY
 printf 'SHA256 (other.iso) = %s\n' "$checksum" > "$work/manifest"
 reject 'Error: selected ISO has no release checksum.' --dry-run
-printf 'SHA256 (install79.iso) = %s\n' "$checksum" > "$work/manifest"
-printf 'SHA256 (install79.iso) = %s\n' "$checksum" >> "$work/manifest"
+printf 'SHA256 (install80.iso) = %s\n' "$checksum" > "$work/manifest"
+printf 'SHA256 (install80.iso) = %s\n' "$checksum" >> "$work/manifest"
 reject 'Error: duplicate ISO checksums in release manifest.' --dry-run
-printf 'SHA256 (install79.iso) = %064d\n' 1 > "$work/manifest"
-printf 'existing iso\n' > install79.iso
+printf 'SHA256 (install80.iso) = %064d\n' 1 > "$work/manifest"
+printf 'existing iso\n' > install80.iso
 reject 'Error: cached ISO checksum differs from the selected release.' --dry-run
-[ "$(cat install79.iso)" = 'existing iso' ]
-printf 'SHA256 (install79.iso) = %s\n' "$checksum" > "$work/manifest"
+[ "$(cat install80.iso)" = 'existing iso' ]
+printf 'SHA256 (install80.iso) = %s\n' "$checksum" > "$work/manifest"
 "$EXPECT" "$repo/qemu.exp" --dry-run > "$work/result"
 grep -q 'Dry run passed: no files created, no VM started.' "$work/result"
-[ "$(cat install79.iso)" = 'existing iso' ]
-rm install79.iso
-ln -s absent install79.iso
-reject "Error: 'install79.iso' must be a regular file." --dry-run
-rm install79.iso
-mkdir install79.iso
-reject "Error: 'install79.iso' must be a regular file." --dry-run
-rmdir install79.iso
+[ "$(cat install80.iso)" = 'existing iso' ]
+rm install80.iso
+ln -s absent install80.iso
+reject "Error: 'install80.iso' must be a regular file." --dry-run
+rm install80.iso
+mkdir install80.iso
+reject "Error: 'install80.iso' must be a regular file." --dry-run
+rmdir install80.iso
 printf '%s\n' 'Provisioning preview regressions passed'

@@ -26,6 +26,22 @@ Agent-tool is controller-only too. Follow the
 [managed skill update procedure](../AGENTS.md#shared-skills-and-shipping) when
 changing its exact pin. CI action references remain pinned to commit SHAs.
 
+## Python distribution availability
+
+The controller interpreter must be available through the pinned uv release on
+both macOS arm64 and Linux amd64. Python 3.15.1 is published upstream, but
+[uv 0.13.4](https://github.com/astral-sh/uv/releases/tag/0.13.4) only provides
+3.15.0 in its managed download catalog. Keep `.python-version` at 3.15.0 until
+`uv python list 3.15.1 --all-platforms --all-arches --all-versions` includes both
+platforms, then update the pin and README and repeat controller and QEMU CI.
+Do not substitute a local-only interpreter while CI still uses uv's catalog.
+
+Use uv 0.13.4 or later to address its
+[emSign CA advisory](https://github.com/astral-sh/uv/security/advisories/GHSA-hq85-5cpj-mr62).
+The repository installs with uv and does not invoke Python's bundled pip; any
+separate use of pip must follow the
+[Python security release guidance](https://www.python.org/downloads/release/python-3151/).
+
 ## Tcl tooling constraints
 
 [tclint's published metadata](https://pypi.org/pypi/tclint/0.9.0/json)
