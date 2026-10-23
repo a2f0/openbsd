@@ -3,7 +3,6 @@
 Run the commands below from the repository root after completing
 [controller setup](../README.md#dependencies-and-linting).
 
-
 Install Expect, QEMU, wget, and GNU coreutils on the controller (Ubuntu:
 `sudo apt-get install expect qemu-system-x86 wget coreutils`; macOS:
 `brew install qemu wget coreutils`, using the system `/usr/bin/expect`). QEMU can
@@ -52,7 +51,6 @@ fresh SSH key login. It also checks that no packages or target Python were
 installed. This disposable-VM test uses `su` on the root console, and requires
 `ROOT_PASSWORD` and `SSH_IDENTITY_FILE` too. `./boot.exp --verify-hardened`
 boots again and verifies that the settings survived reboot. CI runs both.
-
 
 See [native baseline operations](baseline.md) for the settings applied by the
 hardening checks and the manual deployment workflow.

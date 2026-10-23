@@ -3,7 +3,6 @@
 Run the controller commands below from the repository root after completing
 [controller setup](../README.md#dependencies-and-linting).
 
-
 Review `baseline/sshd.conf` and `baseline/sysctl.conf` before deployment. This
 host baseline requires SSH public key authentication, disables root SSH login,
 password login and forwarding, limits authentication attempts and login grace

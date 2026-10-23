@@ -31,6 +31,14 @@ prove the absence of warnings: inspect required warnings, timings, and artifacts
 before accepting a check. Keep review verdicts, audit reports, and structured
 decision output visible. Run interactive commands and persistent servers directly.
 
+Use `bun run check` for the local lint, syntax, test, provisioning-guard, and
+managed-skill sequence. This local command does not replace CI's `check` job,
+which installs and verifies a disposable OpenBSD VM. CI validates the actual
+branch with `bun run lint:branch-name <name>`. Feature branches use the configured
+Conventional Commit type followed by `/topic`; main is exempt and there is no
+branch-length cap. Use the managed shipping and reset skills for shared PR and
+confirmed-merge cleanup mechanics.
+
 ## Shared skills and shipping
 
 `@a2f0/agent-tool` is pinned exactly in package.json and bun.lock. After updating

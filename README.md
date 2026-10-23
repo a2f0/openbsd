@@ -60,12 +60,8 @@ their established paths; shared branch, review, PR, and skill mechanics come fro
 the pinned agent-tool. Agent policy belongs in [AGENTS.md](AGENTS.md), with upgrade
 constraints in [dependency maintenance](docs/dependency-upgrades.md).
 
-## Shared validation
+## Validation
 
-After documented dependency setup, `bun run check` records the complete local
-validation sequence with the pinned agent-tool. CI preserves its platform
-integration checks and validates the actual PR or destination branch through
-`bun run lint:branch-name <name>`. Feature branches use `<type>/<topic>`;
-there is no added branch-length cap. Repository-owned provisioning gates remain
-unchanged. The managed `ship-pr` and `reset` skills use shared branch, PR, and
-confirmed-merge cleanup commands.
+After dependency setup, `bun run check` runs the local controller checks and
+records their results. CI also provisions and verifies a disposable OpenBSD VM;
+see [AGENTS.md](AGENTS.md) for the required integration gate.
