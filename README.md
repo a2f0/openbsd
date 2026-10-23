@@ -62,6 +62,6 @@ constraints in [dependency maintenance](docs/dependency-upgrades.md).
 
 ## Validation
 
-After dependency setup, `bun run check` runs the local controller checks and
-records their results. CI also provisions and verifies a disposable OpenBSD VM;
+After dependency setup and installing [Expect](docs/provisioning.md),
+`bun run check` runs the local controller checks and records their results. CI also provisions and verifies a disposable OpenBSD VM;
 see [AGENTS.md](AGENTS.md) for the required integration gate.
