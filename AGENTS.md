@@ -1,6 +1,8 @@
 # Repository guidance
 
-Read README.md before changing the controller or native baseline. Resolve GitHub
+Read README.md and the relevant [provisioning](docs/provisioning.md) or
+[baseline operations](docs/baseline.md) guide before changing the controller or
+native baseline. Resolve GitHub
 identity with `gh repo view --json nameWithOwner`. Work on a feature branch,
 preserve unrelated edits, and use Conventional Commits.
 
@@ -29,6 +31,14 @@ prove the absence of warnings: inspect required warnings, timings, and artifacts
 before accepting a check. Keep review verdicts, audit reports, and structured
 decision output visible. Run interactive commands and persistent servers directly.
 
+Use `bun run check` for the local lint, syntax, test, provisioning-guard, and
+managed-skill sequence. This local command does not replace CI's `check` job,
+which installs and verifies a disposable OpenBSD VM. CI validates the actual
+branch with `bun run lint:branch-name <name>`. Feature branches use the configured
+Conventional Commit type followed by `/topic`; main is exempt and there is no
+branch-length cap. Use the managed shipping and reset skills for shared PR and
+confirmed-merge cleanup mechanics.
+
 ## Shared skills and shipping
 
 `@a2f0/agent-tool` is pinned exactly in package.json and bun.lock. After updating
@@ -51,3 +61,12 @@ and removing resolved ones. Keep run-specific versions, audits, validation,
 previews, and skipped-group evidence in the upgrade PR. The top-level README
 needs only setup, normal usage, and a short maintenance link; do not append
 upgrade reports or duplicate agent instructions there.
+
+## Script and documentation layout
+
+Keep the public controller commands at the repository root and the deployable
+native implementation in `baseline/`. Retain Makefile targets and `tests/` as the
+validation interface. Put future internal maintenance helpers under purpose-based
+`scripts/` directories, without moving product entrypoints merely for uniformity.
+README owns setup and normal command discovery; the linked operational guides own
+procedures and recovery details. Update those guides and their callers together.

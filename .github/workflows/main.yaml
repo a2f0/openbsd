@@ -19,6 +19,11 @@ jobs:
           version: 2026.10.17
       - name: Install locked agent tooling
         run: bun install --frozen-lockfile
+      - name: Validate the actual branch name
+        if: github.event_name == 'pull_request' || github.ref_type == 'branch'
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        run: bun run lint:branch-name "$BRANCH_NAME"
       - name: Check managed agent skills
         run: bun run agents:check
       - name: Install locked dependencies
