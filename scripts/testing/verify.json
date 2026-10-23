@@ -1,0 +1,23 @@
+{
+  "label": "verify",
+  "steps": [
+    {
+      "label": "lint-and-tests",
+      "command": [
+        "make",
+        "lint",
+        "syntax",
+        "test",
+        "test-provisioning"
+      ]
+    },
+    {
+      "label": "skills",
+      "command": [
+        "bun",
+        "run",
+        "agents:check"
+      ]
+    }
+  ]
+}

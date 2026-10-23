@@ -5,8 +5,21 @@
   },
   "merge": {
     "requiredChecks": [
-      { "name": "lint", "workflow": "main" },
-      { "name": "check", "workflow": "main" }
+      {
+        "name": "lint",
+        "workflow": "main"
+      },
+      {
+        "name": "check",
+        "workflow": "main"
+      }
     ]
+  },
+  "branch": {
+    "types": null,
+    "exempt": [
+      "main"
+    ],
+    "maxLength": null
   }
 }

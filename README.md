@@ -59,3 +59,13 @@ controller validation entrypoint. These product commands and native assets retai
 their established paths; shared branch, review, PR, and skill mechanics come from
 the pinned agent-tool. Agent policy belongs in [AGENTS.md](AGENTS.md), with upgrade
 constraints in [dependency maintenance](docs/dependency-upgrades.md).
+
+## Shared validation
+
+After documented dependency setup, `bun run check` records the complete local
+validation sequence with the pinned agent-tool. CI preserves its platform
+integration checks and validates the actual PR or destination branch through
+`bun run lint:branch-name <name>`. Feature branches use `<type>/<topic>`;
+there is no added branch-length cap. Repository-owned provisioning gates remain
+unchanged. The managed `ship-pr` and `reset` skills use shared branch, PR, and
+confirmed-merge cleanup commands.
