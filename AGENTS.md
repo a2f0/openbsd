@@ -1,6 +1,8 @@
 # Repository guidance
 
-Read README.md before changing the controller or native baseline. Resolve GitHub
+Read README.md and the relevant [provisioning](docs/provisioning.md) or
+[baseline operations](docs/baseline.md) guide before changing the controller or
+native baseline. Resolve GitHub
 identity with `gh repo view --json nameWithOwner`. Work on a feature branch,
 preserve unrelated edits, and use Conventional Commits.
 
@@ -51,3 +53,12 @@ and removing resolved ones. Keep run-specific versions, audits, validation,
 previews, and skipped-group evidence in the upgrade PR. The top-level README
 needs only setup, normal usage, and a short maintenance link; do not append
 upgrade reports or duplicate agent instructions there.
+
+## Script and documentation layout
+
+Keep the public controller commands at the repository root and the deployable
+native implementation in `baseline/`. Retain Makefile targets and `tests/` as the
+validation interface. Put future internal maintenance helpers under purpose-based
+`scripts/` directories, without moving product entrypoints merely for uniformity.
+README owns setup and normal command discovery; the linked operational guides own
+procedures and recovery details. Update those guides and their callers together.
