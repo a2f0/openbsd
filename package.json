@@ -15,6 +15,6 @@
     "check": "agent-tool run-group scripts/testing/verify.json"
   },
   "devDependencies": {
-    "@a2f0/agent-tool": "0.1.19"
+    "@a2f0/agent-tool": "0.1.21"
   }
 }
