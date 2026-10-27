@@ -1,7 +1,7 @@
 # Native security baseline
 
 Run the controller commands below from the repository root after completing
-[controller setup](../README.md#dependencies-and-linting).
+[controller setup](../README.md#quick-start).
 
 Review `baseline/sshd.conf` and `baseline/sysctl.conf` before deployment. This
 host baseline requires SSH public key authentication, disables root SSH login,
@@ -86,4 +86,4 @@ bootstrap. Inspect `pkg_info` and its dependents before removing that package;
 migration does not remove packages automatically. Fresh installs need none.
 
 See [VM provisioning](provisioning.md) to create and verify a disposable VM, and
-[repository setup](../README.md#dependencies-and-linting) for controller dependencies.
+[repository setup](../README.md#quick-start) for controller dependencies.

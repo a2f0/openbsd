@@ -4,35 +4,21 @@ Provision an OpenBSD **8.0/amd64** VM and apply a small security baseline with
 OpenBSD's base tools: `sh`, `ssh`, `doas`, `sysctl`, `install`, and `rcctl`.
 The baseline installs **no packages and no Python on the OpenBSD host**.
 
-## Dependencies and linting
+## Quick start
 
-On the controller, [mise](https://mise.jdx.dev/) installs the Bun and
-[uv](https://docs.astral.sh/uv/) versions pinned in `.mise.toml`. CI uses the
-same pins:
+Install [mise](https://mise.jdx.dev/) for the Bun and [uv](https://docs.astral.sh/uv/)
+pins in `.mise.toml`, and Expect, QEMU, wget, and GNU coreutils for the VM preview
+([provisioning](docs/provisioning.md)).
 
 ```sh
 mise install
-bun install --frozen-lockfile
-make deps
-make lint syntax test
+bun install --frozen-lockfile  # pinned agent-tool for `bun run check`
+make deps                      # locked controller Python tools in .venv
+make lint syntax test          # controller checks; no VM needed
+# With USER_PASSWORD and ROOT_PASSWORD set, preview a VM installation; this
+# creates no files and starts no VM.
+./qemu.exp --dry-run
 ```
-
-Python **3.15.1** from `.python-version` runs on the controller only, for the
-installer's local HTTP server and development tools. Exact tool versions are
-in `pyproject.toml`; `uv.lock` pins their transitive dependencies and hashes.
-Expect linting uses `tclint==0.9.0`; shell linting uses the bundled ShellCheck
-**0.11.0** binary in `shellcheck-py==0.11.0.1`. Both run from `.venv`.
-CI actions are pinned to commit SHAs. OS tools come from the selected release's
-repositories so security updates remain available.
-
-`make lint` checks Expect syntax, formatting, and shell scripts; `make syntax`
-checks shell parsing. `make test` checks deployment's authentication and transfer
-failure handling against inherited SSH options. Run `make format` to format
-Expect files. See [dependency maintenance](docs/dependency-upgrades.md) for
-tool updates and controller/host compatibility boundaries.
-
-Coding agents follow [AGENTS.md](AGENTS.md) for controller-only agent tooling,
-command capture, managed skills, and the review and shipping workflow.
 
 ## Provisioning and baseline operations
 
@@ -51,17 +37,24 @@ verified SSH key access and `doas`. Each guide owns its prerequisites, preview,
 execution, verification, and recovery procedure. Controller validation uses mocks;
 it does not require provisioning a VM or changing a real host.
 
+## Validation
+
+| Command | Purpose |
+| --- | --- |
+| `make lint` | Expect syntax and formatting, and shell scripts |
+| `make syntax` | Shell parsing |
+| `make test` | Deployment's authentication and transfer failure handling against inherited SSH options |
+| `make test-provisioning` | The installer preview's refusal to overwrite artifacts or accept missing or mismatched ISO checksums; requires [Expect](docs/provisioning.md) |
+| `make format` | Formats Expect files in place |
+| `bun run check` | Runs `make lint syntax test test-provisioning` and `bun run agents:check`, recording each result; requires Expect |
+
+CI also provisions a disposable OpenBSD VM, applies the baseline, and verifies it
+after a reboot. See [dependency maintenance](docs/dependency-upgrades.md) for tool
+updates and controller/host compatibility boundaries.
+
 ## Repository layout
 
 `baseline/` contains the deployable OpenBSD configuration and native implementation.
 `tests/` contains controller and host regression checks. The Makefile is the stable
-controller validation entrypoint. These product commands and native assets retain
-their established paths; shared branch, review, PR, and skill mechanics come from
-the pinned agent-tool. Agent policy belongs in [AGENTS.md](AGENTS.md), with upgrade
-constraints in [dependency maintenance](docs/dependency-upgrades.md).
-
-## Validation
-
-After dependency setup and installing [Expect](docs/provisioning.md),
-`bun run check` runs the local controller checks and records their results. CI also provisions and verifies a disposable OpenBSD VM;
-see [AGENTS.md](AGENTS.md) for the required integration gate.
+controller validation entrypoint, and `docs/` holds the provisioning, baseline
+operations, and dependency maintenance guides.

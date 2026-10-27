@@ -1,7 +1,7 @@
 # VM provisioning and verification
 
 Run the commands below from the repository root after completing
-[controller setup](../README.md#dependencies-and-linting).
+[controller setup](../README.md#quick-start).
 
 Install Expect, QEMU, wget, and GNU coreutils on the controller (Ubuntu:
 `sudo apt-get install expect qemu-system-x86 wget coreutils`; macOS:

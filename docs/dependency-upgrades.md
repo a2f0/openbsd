@@ -5,11 +5,16 @@ Use the managed `update-dependencies` skill and the repository's
 
 ## Toolchain boundaries
 
-Python and development tools run on the controller. The OpenBSD baseline uses
-base tools and must not gain packages or Python when controller dependencies
+Python and development tools run on the controller. The controller Python that
+`.python-version` selects serves `qemu.exp`'s local installer HTTP server and
+runs the development tools from `.venv`: tclint (`tclint` and `tclfmt`) for
+Expect files, and the ShellCheck binary bundled in `shellcheck-py`, whose version
+is the bundled ShellCheck release plus a packaging suffix. The OpenBSD baseline
+uses base tools and must not gain packages or Python when controller dependencies
 change. Keep the controller Python selection in `.python-version`, its supported
-range in `pyproject.toml`, and CI aligned. Preserve exact development dependency
-pins and refresh `uv.lock` with the pinned uv version.
+range in `pyproject.toml`, and CI aligned. `pyproject.toml` pins the development
+tools exactly, and `uv.lock` pins their transitive dependencies and hashes;
+preserve those exact pins and refresh `uv.lock` with the pinned uv version.
 
 Keep Bun and uv pinned in `.mise.toml`; CI installs those versions with mise.
 Keep `package.json`'s `packageManager` aligned with the Bun pin. Python packages
@@ -17,8 +22,11 @@ remain managed by uv, and `.python-version` remains its interpreter selection.
 
 To update Python tools, change their exact versions, run `uv lock`, then
 `make deps lint syntax test test-provisioning`. Provisioning regression tests
-require Expect and mock external effects; they do not start a VM. Check OS tool
-compatibility separately when changing the OpenBSD release or controller image.
+require Expect and mock external effects; they do not start a VM. Controller OS
+tools (Expect, QEMU, wget, and GNU coreutils) are not pinned: they come from the
+controller OS's packages, which CI installs from its Ubuntu release's
+repositories, so security updates remain available. Check OS tool compatibility
+separately when changing the OpenBSD release or controller image.
 Do not provision a VM or apply the baseline to a real host merely to validate
 documentation or controller tooling.
 
