@@ -21,16 +21,6 @@ Full QEMU installation and hardening run in CI; do not provision a VM or apply
 the baseline to a real host merely to validate documentation or tooling changes.
 No repository Git hooks are installed.
 
-Capture noisy finite commands with `bun run agent:run --label <check> --
-<command> [args...]`, for example
-`bun run agent:run --label checks -- make lint syntax test test-provisioning`.
-The harness preserves exit status and complete private logs, with one compact
-receipt and a bounded failure excerpt. Inspect more with
-`bun run agent-tool logs <log-path>` or a targeted search. A zero exit does not
-prove the absence of warnings: inspect required warnings, timings, and artifacts
-before accepting a check. Keep review verdicts, audit reports, and structured
-decision output visible. Run interactive commands and persistent servers directly.
-
 Use `bun run check` for the local lint, syntax, test, provisioning-guard, and
 managed-skill sequence. This local command does not replace CI's `check` job,
 which installs and verifies a disposable OpenBSD VM. CI validates the actual
@@ -38,6 +28,27 @@ branch with `bun run lint:branch-name <name>`. Feature branches use the configur
 Conventional Commit type followed by `/topic`; main is exempt and there is no
 branch-length cap. Use the managed shipping and reset skills for shared PR and
 confirmed-merge cleanup mechanics.
+
+## Output capture
+
+Run finite, noisy commands, such as installs, builds, tests, linters, and Git
+commands that run hooks, through
+`bun run agent:run --label <name> -- <command> [args...]`. It keeps complete
+output in a private log, preserves the exit status, and prints a compact
+receipt, with a bounded excerpt of the log on failure. Read more with
+`bun run agent:logs <log-path>`, raising `--tail-lines` or `--max-bytes` as
+needed, or with a targeted search of the log. A zero exit does not rule out
+warnings: inspect required warnings, timings, and artifacts before accepting a
+check. Run reviews, version preparation, audits, infrastructure previews, and
+run-group checks directly so their results stay visible, and run interactive
+tools and servers directly too. Never narrow a suite or silence warnings to
+reduce output.
+
+For example, capture the controller checks with
+`bun run agent:run --label checks -- make lint syntax test test-provisioning`.
+`bun run check` is already an `agent-tool run-group` that records each step, so
+run it directly rather than through `agent:run`. Keep audit reports and other
+structured decision output visible.
 
 ## Shared skills and shipping
 
