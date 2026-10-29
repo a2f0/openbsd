@@ -22,7 +22,7 @@ the baseline to a real host merely to validate documentation or tooling changes.
 No repository Git hooks are installed.
 
 Use `bun run check` for the local lint, syntax, test, provisioning-guard, and
-managed-skill sequence. This local command does not replace CI's `check` job,
+managed-skill and permission sequence. This local command does not replace CI's `check` job,
 which installs and verifies a disposable OpenBSD VM. CI validates the actual
 branch with `bun run lint:branch-name <name>`. Feature branches use the configured
 Conventional Commit type followed by `/topic`; main is exempt and there is no
@@ -31,8 +31,8 @@ confirmed-merge cleanup mechanics.
 
 ## Output capture
 
-Run finite, noisy commands, such as installs, builds, tests, linters, and Git
-commands that run hooks, through
+Run finite, noisy commands, such as installs, builds, tests, linters, package
+scripts, and Git commands that run hooks, through
 `bun run agent:run --label <name> -- <command> [args...]`. It keeps complete
 output in a private log, preserves the exit status, and prints a compact
 receipt, with a bounded excerpt of the log on failure. Read more with
@@ -53,10 +53,16 @@ structured decision output visible.
 ## Shared skills and shipping
 
 `@a2f0/agent-tool` is pinned exactly in package.json and bun.lock. After updating
-it, run `bun run agents:sync` and commit the lockfile, `.agent-tool-skills.json`,
-and generated skills under `.agents/skills` and `.claude/skills` together. Do not
-edit managed skills. Keep repository guidance here; do not add CLAUDE.md.
-The existing CI `lint` job runs `bun run agents:check` to detect skill drift.
+it or the `permissions` section of `agent-tool.json`, run `bun run agents:sync`,
+which installs the managed skills and then the generated harness permission
+rules, and commit the lockfile, `.agent-tool-skills.json`, the generated skills
+under `.agents/skills` and `.claude/skills`, `.agent-tool-permissions.json`,
+`.claude/settings.json`, and `.codex/rules/agent-tool.rules` together. Do not
+edit managed skills or generated rules. Keep repository guidance here; do not
+add CLAUDE.md. The existing CI `lint` job runs `bun run agents:check` to detect
+skill and permission drift. `agent-tool.json` classifies no executables:
+agent-tool is the only installed package executable, and the controller linters
+run through `make` from uv's `.venv`.
 
 Use the installed `ship-pr` skill for authorized shipping, including independent
 review of the committed HEAD. `agent-tool.json` requires both `lint` and `check`
