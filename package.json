@@ -2,7 +2,7 @@
   "name": "openbsd-agent-tools",
   "private": true,
   "description": "Controller-only agent workflow tooling for OpenBSD automation",
-  "packageManager": "bun@1.4.3",
+  "packageManager": "bun@1.4.4",
   "engines": {
     "bun": ">=1.4.2"
   },
@@ -16,6 +16,6 @@
     "check": "agent-tool run-group scripts/testing/verify.json"
   },
   "devDependencies": {
-    "@a2f0/agent-tool": "0.1.30"
+    "@a2f0/agent-tool": "0.1.38"
   }
 }
