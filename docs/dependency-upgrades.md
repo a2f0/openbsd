@@ -41,8 +41,7 @@ check the selected uv with
 `uv --no-config python list <version> --only-downloads --all-platforms --all-arches --all-versions`.
 Verify macOS arm64 developer and Linux amd64 CI builds, preserving the supported
 Python range. Repeat locked setup, full controller validation, and disposable-VM
-CI with that interpreter. The [uv catalog update](https://github.com/astral-sh/uv/pull/22938)
-includes the current controller interpreter without a metadata override.
+CI with that interpreter.
 
 If a future security release needs uv's
 [documented catalog override](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url),
@@ -71,7 +70,8 @@ Python requirements when changing the controller interpreter.
 
 The installer uses official OpenBSD release media, not an automatically patched
 image. Check the release's [errata](https://www.openbsd.org/errata80.html) separately
-from controller dependency audits. The baseline does not apply `syspatch` or
+from controller dependency audits; update that link together with
+`qemu.exp`'s `OPENBSD_VERSION`. The baseline does not apply `syspatch` or
 update host certificate/timezone databases; those remain explicit operator
 [maintenance actions](baseline.md#native-maintenance-and-migration). Do not treat
 controller validation or disposable-VM hardening as proof that release media
@@ -80,8 +80,8 @@ contract requires its own safe preview and disposable-VM verification.
 
 ## Advisory coverage
 
-Run `bun audit` on the resolved agent-tool graph and `uv audit --locked` on the
-controller's resolved Python graph, including development dependencies and the
+Using the pinned tools, run `bun audit` on the resolved agent-tool graph and
+`uv audit --locked` on the controller's resolved Python graph, including development dependencies and the
 Linux CI target. Keep uv's preview/schema warnings visible in the run evidence.
 These audits do not inspect the native ShellCheck binary bundled by shellcheck-py,
 controller OS packages, or the OpenBSD base system. Check their official releases
