@@ -68,7 +68,10 @@ Use the installed `ship-pr` skill for authorized shipping, including independent
 review of the committed HEAD. `agent-tool.json` requires both `lint` and `check`
 from workflow `main`; wait for every push and pull-request check to finish.
 There is no package release or deployment workflow. Do not change repository
-protection settings as part of routine shipping.
+protection settings as part of routine shipping. Managed permissions allow
+confirmed-merge guarded cleanup, stale-head CI cancellation, and owned-process
+teardown as shipping follow-through. These grants do not authorize real-host
+operations or merging without the requested scope and exact-head preflight.
 
 ## Dependency documentation
 

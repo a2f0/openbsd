@@ -36,21 +36,25 @@ changing its exact pin. CI action references remain pinned to commit SHAs.
 
 ## Python distribution metadata
 
-Python 3.15.1 was published after uv 0.13.4's embedded download catalog. The
-`python-downloads-json-url` setting in `pyproject.toml` uses uv's
-[documented catalog override](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url)
-with the official metadata from [uv PR #22802](https://github.com/astral-sh/uv/pull/22802),
-pinned to its immutable merge commit. It provides
-checksummed [Astral standalone builds](https://github.com/astral-sh/python-build-standalone/releases/tag/20261021)
-for the same interpreter on developer platforms and Linux CI, without a custom
-installer or global tool changes.
+Use uv's built-in checksummed Python catalog. Before changing `.python-version`,
+check the selected uv with
+`uv --no-config python list <version> --only-downloads --all-platforms --all-arches --all-versions`.
+Verify macOS arm64 developer and Linux amd64 CI builds, preserving the supported
+Python range. Repeat locked setup, full controller validation, and disposable-VM
+CI with that interpreter.
 
-After upgrading uv, check its built-in catalog with
-`uv --no-config python list 3.15.1 --only-downloads --all-platforms --all-arches --all-versions`.
-Remove the override once the catalog includes macOS arm64 and Linux amd64, then
-repeat locked setup, controller validation, and QEMU CI. Until then, keep the
-metadata commit immutable and verify any replacement's download hashes against
-the corresponding official release.
+If a future security release needs uv's
+[documented catalog override](https://docs.astral.sh/uv/reference/settings/#python-downloads-json-url),
+pin official metadata to an immutable commit and verify its release checksums.
+Remove it only after the built-in catalog covers every target it supplied.
+Keep agent-run `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR`, and `UV_TOOL_DIR` in this
+checkout's task runtime, and `UV_PROJECT_ENVIRONMENT` in this checkout. Inspect
+inherited values before setup; another session's exported paths are not safe
+installation destinations. Verify the selected interpreter's `sys.base_prefix`
+too: a foreign interpreter on `PATH` can satisfy the version pin. When needed,
+install with `uv python install --no-bin <version>` into the scoped directory
+and select that interpreter explicitly during `uv sync --locked --python <path>`.
+Never change global tools or trust to run an upgrade.
 
 ## Tcl tooling constraints
 
@@ -61,6 +65,27 @@ pygls also constrains lsprotocol. Revisit them with a supported tclint release,
 regenerate the lockfile, and run the full controller validation above instead of
 overriding the linter's internal dependencies. Check each resolved package's
 Python requirements when changing the controller interpreter.
+
+## Release media and host updates
+
+The installer uses official OpenBSD release media, not an automatically patched
+image. Check the release's [errata](https://www.openbsd.org/errata80.html) separately
+from controller dependency audits; update that link together with
+`qemu.exp`'s `OPENBSD_VERSION`. The baseline does not apply `syspatch` or
+update host certificate/timezone databases; those remain explicit operator
+[maintenance actions](baseline.md#native-maintenance-and-migration). Do not treat
+controller validation or disposable-VM hardening as proof that release media
+contains subsequent base-system security fixes. Changing that host-maintenance
+contract requires its own safe preview and disposable-VM verification.
+
+## Advisory coverage
+
+Using the pinned tools, run `bun audit` on the resolved agent-tool graph and
+`uv audit --locked` on the controller's resolved Python graph, including development dependencies and the
+Linux CI target. Keep uv's preview/schema warnings visible in the run evidence.
+These audits do not inspect the native ShellCheck binary bundled by shellcheck-py,
+controller OS packages, or the OpenBSD base system. Check their official releases
+and advisories separately; a clean npm/Python result is not a whole-system audit.
 
 ## Keeping the record current
 
