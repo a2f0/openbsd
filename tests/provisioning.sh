@@ -1,5 +1,6 @@
 #!/bin/sh
-# Preview regression coverage: no network, disk creation, or virtual machine.
+# Preview and ISO download regression coverage: no network, disk creation, or
+# virtual machine.
 set -eu
 repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 EXPECT=$(command -v expect)
@@ -12,6 +13,12 @@ export PROVISION_TEST_WORK
 cat > "$work/bin/wget" <<'WGET'
 #!/bin/sh
 set -eu
+iso=https://cdn.openbsd.org/pub/OpenBSD/8.0/amd64/install80.iso
+if [ "$#" -eq 6 ] && [ "$6" = "$iso" ]; then
+    [ "$1 $2 $3 $4" = '--no-config --no-hsts -q -O' ] || exit 90
+    printf 'downloaded iso\n' > "$5"
+    exit "${PROVISION_TEST_DOWNLOAD_STATUS:-0}"
+fi
 [ "$*" = '--no-config --no-hsts -q -O - https://cdn.openbsd.org/pub/OpenBSD/8.0/amd64/SHA256' ] || exit 90
 if [ "${PROVISION_TEST_FETCH_FAILURE:-0}" -eq 1 ]; then exit 98; fi
 cat "$PROVISION_TEST_WORK/manifest"
@@ -20,13 +27,29 @@ cat > "$work/bin/sha256sum" <<'CHECKSUM'
 #!/bin/sh
 echo '0000000000000000000000000000000000000000000000000000000000000000  install80.iso'
 CHECKSUM
-cat > "$work/bin/uv" <<'GUARD'
+cat > "$work/bin/qemu-img" <<'GUARD'
 #!/bin/sh
 echo 'Unexpected mutation command' >&2
 exit 91
 GUARD
-cp "$work/bin/uv" "$work/bin/qemu-img"
-cp "$work/bin/uv" "$work/bin/qemu-system-x86_64"
+cp "$work/bin/qemu-img" "$work/bin/qemu-system-x86_64"
+# Installation runs only far enough to download, verify, and reach qemu-img.
+cat > "$work/bin/uv" <<'UV'
+#!/bin/sh
+if [ "${PROVISION_TEST_INSTALL:-0}" -eq 1 ] &&
+    [ "$*" = 'run --locked python -c import sys; print(sys.executable)' ]; then
+    echo "$PROVISION_TEST_WORK/server"
+    exit 0
+fi
+echo 'Unexpected mutation command' >&2
+exit 91
+UV
+cat > "$work/server" <<'SERVER'
+#!/bin/sh
+echo 'Serving HTTP on 127.0.0.1 port 8686'
+exec sleep 60
+SERVER
+chmod +x "$work/server"
 chmod +x "$work/bin/"*
 PATH=$work/bin:$PATH
 export PATH
@@ -79,7 +102,7 @@ printf 'SHA256 (install80.iso) = %s\n' "$checksum" >> "$work/manifest"
 reject 'Error: duplicate ISO checksums in release manifest.' --dry-run
 printf 'SHA256 (install80.iso) = %064d\n' 1 > "$work/manifest"
 printf 'existing iso\n' > install80.iso
-reject 'Error: cached ISO checksum differs from the selected release.' --dry-run
+reject "Error: cached ISO checksum differs from the selected release; move 'install80.iso' aside to download it again." --dry-run
 [ "$(cat install80.iso)" = 'existing iso' ]
 printf 'SHA256 (install80.iso) = %s\n' "$checksum" > "$work/manifest"
 "$EXPECT" "$repo/qemu.exp" --dry-run > "$work/result"
@@ -92,4 +115,18 @@ rm install80.iso
 mkdir install80.iso
 reject "Error: 'install80.iso' must be a regular file." --dry-run
 rmdir install80.iso
+PROVISION_TEST_INSTALL=1
+export PROVISION_TEST_INSTALL
+# A failed or mismatched download must leave no ISO behind to fail preflight.
+PROVISION_TEST_DOWNLOAD_STATUS=4 reject 'Failed to download ISO file.'
+unset PROVISION_TEST_DOWNLOAD_STATUS
+[ -z "$(ls -A)" ] || { ls -A; exit 1; }
+printf 'SHA256 (install80.iso) = %064d\n' 1 > "$work/manifest"
+reject "Error: SHA256 verification failed: $checksum  install80.iso"
+[ -z "$(ls -A)" ] || { ls -A; exit 1; }
+printf 'SHA256 (install80.iso) = %s\n' "$checksum" > "$work/manifest"
+reject 'Unexpected mutation command'
+[ "$(ls -A)" = install80.iso ] || { ls -A; exit 1; }
+[ "$(cat install80.iso)" = 'downloaded iso' ]
+rm install80.iso
 printf '%s\n' 'Provisioning preview regressions passed'

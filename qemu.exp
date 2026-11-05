@@ -85,7 +85,8 @@ if {![catch {file lstat $ISO_FILE iso_info}]} {
         [catch {exec {*}$checksum_command $ISO_FILE} cached_checksum] ||
         [lindex $cached_checksum 0] ne $expected_checksum
     } {
-        puts "Error: cached ISO checksum differs from the selected release."
+        puts "Error: cached ISO checksum differs from the selected release;\
+            move '$ISO_FILE' aside to download it again."
         exit 1
     }
 }
@@ -145,9 +146,10 @@ Set name(s) = -game* -x* -comp*"
 
 set WEB_SERVER_PID ""
 set WEB_SERVER_SPAWN_ID ""
+set ISO_DOWNLOAD_FILE ""
 
 proc cleanup {} {
-    global WEB_SERVER_PID WEB_SERVER_SPAWN_ID INSTALL_CONF_CREATED
+    global WEB_SERVER_PID WEB_SERVER_SPAWN_ID INSTALL_CONF_CREATED ISO_DOWNLOAD_FILE
     puts "Cleaning up..."
     if {$WEB_SERVER_PID != ""} {
         puts "Stopping Python web server (PID: $WEB_SERVER_PID)..."
@@ -158,11 +160,15 @@ proc cleanup {} {
     if {$INSTALL_CONF_CREATED} {
         file delete -force "install.conf"
     }
+    if {$ISO_DOWNLOAD_FILE ne ""} {
+        file delete -force $ISO_DOWNLOAD_FILE
+    }
 }
 
 # Always run cleanup on exit. The handler must not call exit itself, or the
-# script's exit status is replaced with 0.
+# script's exit status is replaced with 0. Signals exit through it as well.
 exit -onexit cleanup
+trap {exit 1} {SIGHUP SIGINT SIGTERM}
 
 puts "Starting Python web server on port 8686..."
 set python_executable [exec uv run --locked python -c {import sys; print(sys.executable)}]
@@ -196,12 +202,22 @@ proc download_file {url filename} {
     return 0
 }
 
+# Download beside the ISO and rename it into place only after verification, so
+# a partial or mismatched download is deleted rather than cached.
+set verify_file $ISO_FILE
 if {![file exists $ISO_FILE]} {
     puts "ISO file not found: $ISO_FILE"
     set download_url "$RELEASE_URL/$ISO_FILE"
+    set partial_iso "$ISO_FILE.[pid].part"
+    if {![catch {file lstat $partial_iso target_info}]} {
+        puts "Error: '$partial_iso' already exists."
+        exit 1
+    }
+    set ISO_DOWNLOAD_FILE $partial_iso
+    set verify_file $partial_iso
 
-    if {[download_file $download_url $ISO_FILE]} {
-        puts "Download completed: $ISO_FILE"
+    if {[download_file $download_url $partial_iso]} {
+        puts "Download completed: $partial_iso"
     } else {
         puts "Failed to download ISO file."
         cleanup
@@ -213,13 +229,21 @@ if {![file exists $ISO_FILE]} {
 
 # Verify SHA256 checksums
 puts "Verifying SHA256 checksums..."
-set sha256_result [catch {exec {*}$checksum_command $ISO_FILE} sha256_output]
+set sha256_result [catch {exec {*}$checksum_command $verify_file} sha256_output]
 if {$sha256_result != 0 || [lindex $sha256_output 0] ne $expected_checksum} {
     puts "Error: SHA256 verification failed: $sha256_output"
     cleanup
     exit 1
 }
 puts "SHA256 verification completed successfully"
+if {$ISO_DOWNLOAD_FILE ne ""} {
+    # Without -force, refuse to replace an ISO that appeared during download.
+    if {[catch {file rename $ISO_DOWNLOAD_FILE $ISO_FILE} rename_output]} {
+        puts "Error: could not move the verified ISO into place: $rename_output"
+        exit 1
+    }
+    set ISO_DOWNLOAD_FILE ""
+}
 
 if {![catch {file lstat $DISK_FILE target_info}]} {
     puts "Error: Virtual disk '$DISK_FILE' already exists."

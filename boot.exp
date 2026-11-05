@@ -70,7 +70,7 @@ if {$argc == 0} {
 if {$HARDEN} {
     foreach required_var {ROOT_PASSWORD SSH_IDENTITY_FILE} {
         if {![info exists env($required_var)] || $env($required_var) eq ""} {
-            puts "Error: $required_var must be set for --check-hardened."
+            puts "Error: $required_var must be set for [lindex $argv 0]."
             exit 1
         }
     }
