@@ -25,6 +25,8 @@ cat "$PROVISION_TEST_WORK/manifest"
 WGET
 cat > "$work/bin/sha256sum" <<'CHECKSUM'
 #!/bin/sh
+# Fail like sha256sum on a missing file, so verifying the wrong path is caught.
+[ "$#" -eq 1 ] && [ -f "$1" ] || exit 1
 echo '0000000000000000000000000000000000000000000000000000000000000000  install80.iso'
 CHECKSUM
 cat > "$work/bin/qemu-img" <<'GUARD'
