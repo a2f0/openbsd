@@ -17,6 +17,11 @@ iso=https://cdn.openbsd.org/pub/OpenBSD/8.0/amd64/install80.iso
 if [ "$#" -eq 6 ] && [ "$6" = "$iso" ]; then
     [ "$1 $2 $3 $4" = '--no-config --no-hsts -q -O' ] || exit 90
     printf 'downloaded iso\n' > "$5"
+    if [ "${PROVISION_TEST_DOWNLOAD_RACE:-0}" -eq 1 ]; then mkdir install80.iso; fi
+    if [ "${PROVISION_TEST_DOWNLOAD_BLOCK:-0}" -eq 1 ]; then
+        echo "$$" > "$PROVISION_TEST_WORK/wget.pid"
+        exec sleep 60
+    fi
     exit "${PROVISION_TEST_DOWNLOAD_STATUS:-0}"
 fi
 [ "$*" = '--no-config --no-hsts -q -O - https://cdn.openbsd.org/pub/OpenBSD/8.0/amd64/SHA256' ] || exit 90
@@ -131,4 +136,28 @@ reject 'Unexpected mutation command'
 [ "$(ls -A)" = install80.iso ] || { ls -A; exit 1; }
 [ "$(cat install80.iso)" = 'downloaded iso' ]
 rm install80.iso
+PROVISION_TEST_DOWNLOAD_RACE=1 reject "Error: 'install80.iso' appeared during the download."
+unset PROVISION_TEST_DOWNLOAD_RACE
+[ "$(ls -A)" = install80.iso ] && [ -z "$(ls -A install80.iso)" ] || { ls -AR; exit 1; }
+rmdir install80.iso
+# A hung-up download exits through cleanup (Expect already exits cleanly on
+# INT and TERM). Expect handles the signal once
+# the blocking wget returns, so stop wget as a terminal interrupt would.
+PROVISION_TEST_DOWNLOAD_BLOCK=1 "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1 &
+installer=$!
+tries=0
+until [ -s "$work/wget.pid" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || { cat "$work/result"; exit 1; }
+    sleep 0.1
+done
+kill -HUP "$installer"
+sleep 0.2
+kill "$(cat "$work/wget.pid")"
+if wait "$installer"; then
+    echo 'Interrupted installation exited successfully' >&2; exit 1
+fi
+# The signal, not wget's failure, must end the run.
+if grep -q 'wget failed' "$work/result"; then cat "$work/result"; exit 1; fi
+[ -z "$(ls -A)" ] || { ls -A; exit 1; }
 printf '%s\n' 'Provisioning preview regressions passed'

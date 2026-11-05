@@ -237,7 +237,11 @@ if {$sha256_result != 0 || [lindex $sha256_output 0] ne $expected_checksum} {
 }
 puts "SHA256 verification completed successfully"
 if {$ISO_DOWNLOAD_FILE ne ""} {
-    # Without -force, refuse to replace an ISO that appeared during download.
+    # Never replace, or move into, anything that appeared during the download.
+    if {![catch {file lstat $ISO_FILE target_info}]} {
+        puts "Error: '$ISO_FILE' appeared during the download."
+        exit 1
+    }
     if {[catch {file rename $ISO_DOWNLOAD_FILE $ISO_FILE} rename_output]} {
         puts "Error: could not move the verified ISO into place: $rename_output"
         exit 1
