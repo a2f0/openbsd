@@ -29,7 +29,10 @@ applying=0
 committed=0
 cleanup() {
     result=$?
-    trap - 0 HUP INT TERM
+    # Ignore further signals, so a second interrupt cannot stop the rollback
+    # or leave the lock behind. Commands run here inherit this.
+    trap - 0
+    trap '' HUP INT TERM
     set +e
     if [ "$applying" -eq 1 ] && [ "$committed" -eq 0 ]; then
         printf '%s\n' "Application failed; restoring previous files and kernel settings" >&2
