@@ -308,7 +308,10 @@ send "system_powerdown\r"
 
 puts "Waiting for vm to stop..."
 
-# Drain the console until QEMU exits before reaping the child process.
+# Only the guest's own report proves it flushed the new disk: QEMU also exits 0
+# when a signal stops it. Then drain the console until QEMU exits before
+# reaping the child process.
+expect -timeout 120 -re {syncing disks\.\.\. done}
 expect -timeout 120 eof
 set vm_status [wait]
 # A signal-killed QEMU reports status 0 followed by CHILDKILLED; accept only
