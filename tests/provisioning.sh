@@ -160,4 +160,48 @@ fi
 # The signal, not wget's failure, must end the run.
 if grep -q 'wget failed' "$work/result"; then cat "$work/result"; exit 1; fi
 [ -z "$(ls -A)" ] || { ls -A; exit 1; }
+
+# A hung-up boot must still power the VM down through the QEMU monitor, so the
+# guest flushes its disk. The fake VM reads raw console bytes as hex.
+mkdir "$work/vm"
+cat > "$work/vm/qemu-system-x86_64" <<'VM'
+#!/bin/sh
+stty -icanon -echo min 1 time 0
+echo "$$" > "$PROVISION_TEST_WORK/vm.pid"
+printf 'Booting\r\n'
+input=
+while byte=$(dd bs=1 count=1 2> /dev/null | od -An -tx1 | tr -d ' \n') && [ -n "$byte" ]; do
+    input="$input$byte"
+    case "$input" in
+        # Control-A, c opens the monitor.
+        *0163) printf '(qemu) '; input= ;;
+        # system_powerdown followed by a carriage return or newline.
+        *73797374656d5f706f776572646f776e0d | *73797374656d5f706f776572646f776e0a)
+            echo powerdown > "$PROVISION_TEST_WORK/vm.log"
+            exit 0 ;;
+    esac
+done
+exit 1
+VM
+chmod +x "$work/vm/qemu-system-x86_64"
+printf 'disk\n' > openbsd-vm.qcow2
+PATH=$work/vm:$PATH "$EXPECT" "$repo/boot.exp" > "$work/result" 2>&1 &
+booter=$!
+tries=0
+until [ -s "$work/vm.pid" ]; do
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || { cat "$work/result"; exit 1; }
+    sleep 0.1
+done
+sleep 0.2
+kill -HUP "$booter"
+if wait "$booter"; then
+    echo 'Hung-up boot exited successfully' >&2; exit 1
+fi
+if [ "$(cat "$work/vm.log" 2> /dev/null)" != powerdown ]; then
+    cat "$work/result"
+    kill "$(cat "$work/vm.pid")" 2> /dev/null || :
+    echo 'Hung-up boot did not power down the VM' >&2; exit 1
+fi
+rm openbsd-vm.qcow2
 printf '%s\n' 'Provisioning preview regressions passed'

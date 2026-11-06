@@ -54,6 +54,9 @@ exit -onexit {
         file delete -force $::auth_log_file
     }
 }
+# Expect skips exit handlers on an untrapped SIGHUP, so a closed terminal would
+# kill QEMU without a guest shutdown. Signals exit through the handler.
+trap {exit 1} {SIGHUP SIGINT SIGTERM}
 
 set HARDEN 0
 if {$argc == 0} {
