@@ -311,7 +311,9 @@ puts "Waiting for vm to stop..."
 # Drain the console until QEMU exits before reaping the child process.
 expect -timeout 120 eof
 set vm_status [wait]
-if {[lindex $vm_status 2] != 0 || [lindex $vm_status 3] != 0} {
+# A signal-killed QEMU reports status 0 followed by CHILDKILLED; accept only
+# a plain zero exit.
+if {[llength $vm_status] != 4 || [lindex $vm_status 2] != 0 || [lindex $vm_status 3] != 0} {
     puts "\nError: QEMU did not exit cleanly after the installation: $vm_status"
     exit 1
 }

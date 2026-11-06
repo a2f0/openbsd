@@ -199,6 +199,7 @@ while byte=$(dd bs=1 count=1 2> /dev/null | od -An -tx1 | tr -d ' \n') && [ -n "
     case "$input" in
         *0163) printf '(qemu) '; input= ;;
         *73797374656d5f706f776572646f776e0d | *73797374656d5f706f776572646f776e0a)
+            if [ "${PROVISION_TEST_VM_KILLED:-0}" -eq 1 ]; then kill -TERM "$$"; fi
             exit "${PROVISION_TEST_VM_STATUS:-0}" ;;
     esac
 done
@@ -218,6 +219,8 @@ PROVISION_TEST_VM_FAIL=1 install_rejected 'Error: QEMU exited unexpectedly'
 unset PROVISION_TEST_VM_FAIL
 PROVISION_TEST_VM_STATUS=3 install_rejected 'Error: QEMU did not exit cleanly after the installation'
 unset PROVISION_TEST_VM_STATUS
+PROVISION_TEST_VM_KILLED=1 install_rejected 'Error: QEMU did not exit cleanly after the installation'
+unset PROVISION_TEST_VM_KILLED
 # Hanging up mid-installation must discard the disk as well.
 rm -f "$work/installer.pid"
 # Background Expect itself, not a subshell, so the signal reaches it.
