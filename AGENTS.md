@@ -50,6 +50,22 @@ For example, capture the controller checks with
 run it directly rather than through `agent:run`. Keep audit reports and other
 structured decision output visible.
 
+## State machines
+
+Make implicit state machines explicit when you write or change code: one closed
+state type (a discriminated union, enum, or sealed type) carrying each state's
+data, typed events, and one pure transition function, with effects run on
+entering a state and async work tagged so only the current request can finish.
+Follow the `explicit-state-machines` skill for what to convert, what to leave
+alone, and how to prove behavior did not change; `agent-tool state-machines`
+lists leads. Reviews flag new implicit machines.
+
+Here that means shell and Expect: one `state` variable driven by a
+`case "$state" in` loop (`switch` in Expect) rather than several progress
+flags. Phases live in `baseline/baseline.sh` (lock, apply, commit, rollback),
+`qemu.exp`, and `boot.exp`; their flags are linear, one writer each, read only
+by cleanup, so convert only when a change adds resumable or branching phases.
+
 ## Shared skills and shipping
 
 `@a2f0/agent-tool` is pinned exactly in package.json and bun.lock. After updating
