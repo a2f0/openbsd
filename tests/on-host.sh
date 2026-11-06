@@ -72,14 +72,15 @@ cmp "$work/before" "$work/after"
 
 # An interrupt during application must roll back and unlock, even when another
 # interrupt arrives during the rollback. This copy differs only in its PATH,
-# which puts an rcctl first that interrupts the baseline on every call.
+# which puts an rcctl first that interrupts the baseline and itself on every
+# call, as a terminal interrupt reaches the whole foreground process group.
 mkdir "$work/interrupt" "$work/interrupt/bin"
 cp "$repo"/baseline/* "$work/interrupt/"
 sed "s|^PATH=/bin:|PATH=$work/interrupt/bin:/bin:|" "$repo/baseline/baseline.sh" > "$work/interrupt/baseline.sh"
 grep -q "^PATH=$work/interrupt/bin:" "$work/interrupt/baseline.sh"
 cat > "$work/interrupt/bin/rcctl" <<'RCCTL'
 #!/bin/sh
-kill -INT "$PPID"
+kill -INT "$PPID" "$$"
 exec /usr/sbin/rcctl "$@"
 RCCTL
 chmod +x "$work/interrupt/bin/rcctl"
