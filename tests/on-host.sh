@@ -70,6 +70,31 @@ if sh "$work/bad/baseline.sh" apply; then echo "Invalid sysctl value accepted" >
 snapshot > "$work/after"
 cmp "$work/before" "$work/after"
 
+# An interrupt during application must roll back and unlock, even when another
+# interrupt arrives during the rollback. This copy differs only in its PATH,
+# which puts an rcctl first that interrupts the baseline and itself on every
+# call, as a terminal interrupt reaches the whole foreground process group.
+mkdir "$work/interrupt" "$work/interrupt/bin"
+cp "$repo"/baseline/* "$work/interrupt/"
+sed "s|^PATH=/bin:|PATH=$work/interrupt/bin:/bin:|" "$repo/baseline/baseline.sh" > "$work/interrupt/baseline.sh"
+grep -q "^PATH=$work/interrupt/bin:" "$work/interrupt/baseline.sh"
+cat > "$work/interrupt/bin/rcctl" <<'RCCTL'
+#!/bin/sh
+kill -INT "$PPID" "$$"
+exec /usr/sbin/rcctl "$@"
+RCCTL
+chmod +x "$work/interrupt/bin/rcctl"
+if sh "$work/interrupt/baseline.sh" apply > "$work/interrupt.log" 2>&1; then
+    echo "Interrupted apply succeeded" >&2; exit 1
+fi
+cat "$work/interrupt.log"
+grep -q 'Application failed' "$work/interrupt.log"
+[ ! -e /var/run/openbsd-baseline.lock ] || { echo "Interrupted rollback left the lock" >&2; exit 1; }
+set -- /tmp/openbsd-baseline.*
+[ ! -e "$1" ] || { echo "Interrupted rollback left its work directory" >&2; exit 1; }
+snapshot > "$work/after"
+cmp "$work/before" "$work/after"
+
 sh "$baseline" apply --ssh-context "$context"
 sh "$baseline" verify --ssh-context "$context"
 sh "$baseline" apply --ssh-context "$context" > "$work/repeat"

@@ -55,7 +55,8 @@ Files are atomically installed as root:wheel with modes `0600` and `0644`.
 Changed files receive backups named `.baseline.<UTC timestamp>.<pid>`; sshd
 reloads only when its file changes. A failed apply attempts to restore original
 files, ownership, permissions and kernel values, then reload the original SSH
-configuration. Runs use a lock in `/var/run/openbsd-baseline.lock`; after a
+configuration; further interrupts are ignored until the rollback and unlock
+finish. Runs use a lock in `/var/run/openbsd-baseline.lock`; after a
 forced kill, remove a stale lock only after confirming the process has stopped.
 
 The deployment helper also validates the SSH `Match` policy for the current
