@@ -91,16 +91,25 @@ if {![catch {file lstat $ISO_FILE iso_info}]} {
     }
 }
 
-set create_command [list qemu-img create -f qcow2 $DISK_FILE 5G]
+# Install onto a temporary disk beside the final one and rename it into place
+# only after a clean power-down, so a failed or interrupted installation never
+# leaves a half-installed disk that boot.exp would trust.
+set PARTIAL_DISK_FILE "$DISK_FILE.[pid].part"
+if {![catch {file lstat $PARTIAL_DISK_FILE target_info}]} {
+    puts "Error: '$PARTIAL_DISK_FILE' already exists."
+    exit 1
+}
+set create_command [list qemu-img create -f qcow2 $PARTIAL_DISK_FILE 5G]
 set install_command [list qemu-system-x86_64 -m 4096 -smp cpus=2 -nographic \
     -drive file=$ISO_FILE,format=raw,if=ide,index=2,media=cdrom,readonly=on \
-    -drive file=$DISK_FILE,format=qcow2,if=ide,index=0 \
+    -drive file=$PARTIAL_DISK_FILE,format=qcow2,if=ide,index=0 \
     -device e1000,netdev=installer -netdev user,id=installer -boot c]
 puts "Preview: OpenBSD $OPENBSD_VERSION/amd64 in [file normalize .]"
 puts "ISO: $RELEASE_URL/$ISO_FILE SHA256=$expected_checksum"
 puts "Plan: verify/download ISO; create private install.conf; serve on 127.0.0.1:8686"
 puts "Plan: $create_command"
 puts "Plan: $install_command; install on fresh sd0; power down; remove install.conf"
+puts "Plan: rename $PARTIAL_DISK_FILE to $DISK_FILE after a clean power-down"
 if {$DRY_RUN} {
     puts "Dry run passed: no files created, no VM started."
     exit 0
@@ -147,9 +156,11 @@ Set name(s) = -game* -x* -comp*"
 set WEB_SERVER_PID ""
 set WEB_SERVER_SPAWN_ID ""
 set ISO_DOWNLOAD_FILE ""
+set DISK_CREATE_FILE ""
 
 proc cleanup {} {
     global WEB_SERVER_PID WEB_SERVER_SPAWN_ID INSTALL_CONF_CREATED ISO_DOWNLOAD_FILE
+    global DISK_CREATE_FILE
     puts "Cleaning up..."
     if {$WEB_SERVER_PID != ""} {
         puts "Stopping Python web server (PID: $WEB_SERVER_PID)..."
@@ -162,6 +173,9 @@ proc cleanup {} {
     }
     if {$ISO_DOWNLOAD_FILE ne ""} {
         file delete -force $ISO_DOWNLOAD_FILE
+    }
+    if {$DISK_CREATE_FILE ne ""} {
+        file delete -force $DISK_CREATE_FILE
     }
 }
 
@@ -258,6 +272,7 @@ if {![catch {file lstat $DISK_FILE target_info}]} {
 generate_install_conf
 
 puts "Creating virtual disk image..."
+set DISK_CREATE_FILE $PARTIAL_DISK_FILE
 exec {*}$create_command
 
 puts "Starting QEMU with host access through 10.0.2.2"
@@ -293,8 +308,28 @@ send "system_powerdown\r"
 
 puts "Waiting for vm to stop..."
 
-# Drain the console until QEMU exits before reaping the child process.
+# Only the guest's own report proves it flushed the new disk: QEMU also exits 0
+# when a signal stops it. OpenBSD counts down busy buffers before "done" and
+# prints "giving up" instead when they never drain. Then drain the console
+# until QEMU exits before reaping the child process.
+expect -timeout 120 -re {syncing disks\.\.\.( [0-9]+)* done}
 expect -timeout 120 eof
-wait
+set vm_status [wait]
+# A signal-killed QEMU reports status 0 followed by CHILDKILLED; accept only
+# a plain zero exit.
+if {[llength $vm_status] != 4 || [lindex $vm_status 2] != 0 || [lindex $vm_status 3] != 0} {
+    puts "\nError: QEMU did not exit cleanly after the installation: $vm_status"
+    exit 1
+}
+# Never replace, or move into, anything that appeared during the installation.
+if {![catch {file lstat $DISK_FILE target_info}]} {
+    puts "Error: '$DISK_FILE' appeared during the installation."
+    exit 1
+}
+if {[catch {file rename $PARTIAL_DISK_FILE $DISK_FILE} rename_output]} {
+    puts "Error: could not move the installed disk into place: $rename_output"
+    exit 1
+}
+set DISK_CREATE_FILE ""
 
 puts "\rFinished"

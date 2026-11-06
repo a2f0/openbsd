@@ -35,14 +35,19 @@ Downloads go to a temporary file beside the ISO, which is renamed into place
 only after its checksum passes and is deleted on failure or interruption. A
 mismatched cached ISO fails the preview and remains untouched; inspect it and
 move it aside before retrying the download.
+The installer likewise writes a temporary disk beside `openbsd-vm.qcow2` and
+renames it into place only after QEMU powers down cleanly, so a failed, timed
+out, or interrupted installation deletes it rather than leaving a half-installed
+disk for `boot.exp` to boot or a later run to refuse.
 This checks integrity from the HTTPS release source; independent signature
 verification requires [signify](https://www.openbsd.org/faq/faq4.html#Download).
 Explicit QEMU drive formats and network devices preserve the IDE disk and
 e1000 adapter without relying on legacy option defaults.
 After installing Expect, `make test-provisioning` checks the preview's refusal
 to overwrite existing artifacts or accept missing/mismatched ISO checksums,
-and that a failed or mismatched download leaves no ISO behind, using mocked
-controller commands without starting a VM.
+that a failed or mismatched download leaves no ISO behind, and that a failed,
+unclean, or hung-up installation leaves no disk behind, using mocked controller
+commands without starting a VM.
 
 `./boot.exp --check` tests console and SSH logins, then powers off the VM.
 It requires `USER_PASSWORD`; `SSH_IDENTITY_FILE` selects a private key. The SSH

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Preview and ISO download regression coverage: no network, disk creation, or
-# virtual machine.
+# Preview, ISO download, and installation failure regression coverage: no
+# network, real disk, or virtual machine.
 set -eu
 repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 EXPECT=$(command -v expect)
@@ -160,6 +160,102 @@ fi
 # The signal, not wget's failure, must end the run.
 if grep -q 'wget failed' "$work/result"; then cat "$work/result"; exit 1; fi
 [ -z "$(ls -A)" ] || { ls -A; exit 1; }
+
+# A failed or interrupted installation must not leave a half-installed disk at
+# the path boot.exp trusts; only a clean power-down publishes it. The fake
+# qemu-img creates the disk it is given, and the fake installer VM answers the
+# console dialogue, marks its disk installed, and exits with the chosen status.
+mkdir "$work/disk"
+cat > "$work/disk/qemu-img" <<'IMG'
+#!/bin/sh
+set -eu
+[ "$#" -eq 5 ] && [ "$1 $2 $3 $5" = 'create -f qcow2 5G' ] && [ ! -e "$4" ] || exit 90
+case "$4" in /*) exit 90 ;; esac
+printf 'blank\n' > "$4"
+IMG
+cat > "$work/disk/qemu-system-x86_64" <<'VM'
+#!/bin/sh
+set -eu
+disk=
+for argument do
+    case "$argument" in file=*,format=qcow2,*) disk=${argument#file=}; disk=${disk%%,*} ;; esac
+done
+[ -n "$disk" ] && [ "$(cat "$disk")" = blank ] || exit 90
+[ -f install.conf ] || exit 90
+echo "$$" > "$PROVISION_TEST_WORK/installer.pid"
+[ "${PROVISION_TEST_VM_FAIL:-0}" -eq 0 ] || exit 1
+printf 'boot> '; read -r line
+printf 'boot> '; read -r line
+printf '(I)nstall, (U)pgrade, (A)utoinstall or (S)hell? '; read -r line
+printf 'Response file location? '; read -r line
+[ "$line" = http://10.0.2.2:8686/install.conf ] || exit 90
+printf 'installed\n' > "$disk"
+if [ "${PROVISION_TEST_VM_BLOCK:-0}" -eq 1 ]; then exec sleep 60; fi
+printf 'login: '
+stty -icanon -echo min 1 time 0
+input=
+while byte=$(dd bs=1 count=1 2> /dev/null | od -An -tx1 | tr -d ' \n') && [ -n "$byte" ]; do
+    input="$input$byte"
+    case "$input" in
+        *0163) printf '(qemu) '; input= ;;
+        *73797374656d5f706f776572646f776e0d | *73797374656d5f706f776572646f776e0a)
+            # QEMU exits 0 on SIGTERM without the guest syncing its disks.
+            if [ "${PROVISION_TEST_VM_TERM:-0}" -eq 1 ]; then trap 'exit 0' TERM; kill -TERM "$$"; fi
+            printf 'syncing disks...%s\r\n' "${PROVISION_TEST_VM_SYNC:- done}"
+            if [ "${PROVISION_TEST_VM_KILLED:-0}" -eq 1 ]; then kill -TERM "$$"; fi
+            exit "${PROVISION_TEST_VM_STATUS:-0}" ;;
+    esac
+done
+exit 1
+VM
+chmod +x "$work/disk/"*
+printf 'cached iso\n' > install80.iso
+install() {
+    PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1
+}
+install_rejected() {
+    if install; then cat "$work/result"; echo 'Failed installation succeeded' >&2; exit 1; fi
+    grep -Fq "$1" "$work/result" || { cat "$work/result"; exit 1; }
+    [ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
+}
+PROVISION_TEST_VM_FAIL=1 install_rejected 'Error: QEMU exited unexpectedly'
+unset PROVISION_TEST_VM_FAIL
+PROVISION_TEST_VM_STATUS=3 install_rejected 'Error: QEMU did not exit cleanly after the installation'
+unset PROVISION_TEST_VM_STATUS
+PROVISION_TEST_VM_KILLED=1 install_rejected 'Error: QEMU did not exit cleanly after the installation'
+unset PROVISION_TEST_VM_KILLED
+PROVISION_TEST_VM_TERM=1 install_rejected 'Error: QEMU exited unexpectedly'
+unset PROVISION_TEST_VM_TERM
+PROVISION_TEST_VM_SYNC=' 3 2 giving up' install_rejected 'Error: QEMU exited unexpectedly'
+unset PROVISION_TEST_VM_SYNC
+# Hanging up mid-installation must discard the disk as well.
+rm -f "$work/installer.pid"
+# Background Expect itself, not a subshell, so the signal reaches it.
+PROVISION_TEST_VM_BLOCK=1 PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1 &
+installer=$!
+tries=0
+until [ -s "$work/installer.pid" ] && grep -q 'Response file location' "$work/result"; do
+    tries=$((tries + 1))
+    [ "$tries" -le 100 ] || { cat "$work/result"; exit 1; }
+    sleep 0.1
+done
+sleep 0.2
+kill -HUP "$installer"
+if wait "$installer"; then echo 'Hung-up installation exited successfully' >&2; exit 1; fi
+kill "$(cat "$work/installer.pid")" 2> /dev/null || :
+[ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
+install || { cat "$work/result"; exit 1; }
+[ "$(cat openbsd-vm.qcow2)" = installed ] || { cat "$work/result"; ls -A; exit 1; }
+[ "$(ls -A)" = 'install80.iso
+openbsd-vm.qcow2' ] || { ls -A; exit 1; }
+rm openbsd-vm.qcow2
+# The guest may count down busy buffers before reporting a clean sync.
+PROVISION_TEST_VM_SYNC=' 3 1 done' install || { cat "$work/result"; exit 1; }
+unset PROVISION_TEST_VM_SYNC
+[ "$(cat openbsd-vm.qcow2)" = installed ] || { cat "$work/result"; ls -A; exit 1; }
+[ "$(ls -A)" = 'install80.iso
+openbsd-vm.qcow2' ] || { ls -A; exit 1; }
+rm install80.iso openbsd-vm.qcow2
 
 # A hung-up boot must still power the VM down through the QEMU monitor, so the
 # guest flushes its disk. The fake VM reads raw console bytes as hex.
