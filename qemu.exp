@@ -309,9 +309,10 @@ send "system_powerdown\r"
 puts "Waiting for vm to stop..."
 
 # Only the guest's own report proves it flushed the new disk: QEMU also exits 0
-# when a signal stops it. Then drain the console until QEMU exits before
-# reaping the child process.
-expect -timeout 120 -re {syncing disks\.\.\. done}
+# when a signal stops it. OpenBSD counts down busy buffers before "done" and
+# prints "giving up" instead when they never drain. Then drain the console
+# until QEMU exits before reaping the child process.
+expect -timeout 120 -re {syncing disks\.\.\.( [0-9]+)* done}
 expect -timeout 120 eof
 set vm_status [wait]
 # A signal-killed QEMU reports status 0 followed by CHILDKILLED; accept only

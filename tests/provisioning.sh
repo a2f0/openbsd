@@ -201,7 +201,7 @@ while byte=$(dd bs=1 count=1 2> /dev/null | od -An -tx1 | tr -d ' \n') && [ -n "
         *73797374656d5f706f776572646f776e0d | *73797374656d5f706f776572646f776e0a)
             # QEMU exits 0 on SIGTERM without the guest syncing its disks.
             if [ "${PROVISION_TEST_VM_TERM:-0}" -eq 1 ]; then trap 'exit 0' TERM; kill -TERM "$$"; fi
-            printf 'syncing disks... done\r\n'
+            printf 'syncing disks...%s\r\n' "${PROVISION_TEST_VM_SYNC:- done}"
             if [ "${PROVISION_TEST_VM_KILLED:-0}" -eq 1 ]; then kill -TERM "$$"; fi
             exit "${PROVISION_TEST_VM_STATUS:-0}" ;;
     esac
@@ -226,6 +226,8 @@ PROVISION_TEST_VM_KILLED=1 install_rejected 'Error: QEMU did not exit cleanly af
 unset PROVISION_TEST_VM_KILLED
 PROVISION_TEST_VM_TERM=1 install_rejected 'Error: QEMU exited unexpectedly'
 unset PROVISION_TEST_VM_TERM
+PROVISION_TEST_VM_SYNC=' 3 2 giving up' install_rejected 'Error: QEMU exited unexpectedly'
+unset PROVISION_TEST_VM_SYNC
 # Hanging up mid-installation must discard the disk as well.
 rm -f "$work/installer.pid"
 # Background Expect itself, not a subshell, so the signal reaches it.
@@ -243,6 +245,13 @@ if wait "$installer"; then echo 'Hung-up installation exited successfully' >&2; 
 kill "$(cat "$work/installer.pid")" 2> /dev/null || :
 [ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
 install || { cat "$work/result"; exit 1; }
+[ "$(cat openbsd-vm.qcow2)" = installed ] || { cat "$work/result"; ls -A; exit 1; }
+[ "$(ls -A)" = 'install80.iso
+openbsd-vm.qcow2' ] || { ls -A; exit 1; }
+rm openbsd-vm.qcow2
+# The guest may count down busy buffers before reporting a clean sync.
+PROVISION_TEST_VM_SYNC=' 3 1 done' install || { cat "$work/result"; exit 1; }
+unset PROVISION_TEST_VM_SYNC
 [ "$(cat openbsd-vm.qcow2)" = installed ] || { cat "$work/result"; ls -A; exit 1; }
 [ "$(ls -A)" = 'install80.iso
 openbsd-vm.qcow2' ] || { ls -A; exit 1; }
