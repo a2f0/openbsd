@@ -21,7 +21,8 @@ Set `SSH_PUBLIC_KEY` before installation to authorize your own key for `a2f0`;
 otherwise the existing default public key is used. SSH is forwarded at
 `a2f0@127.0.0.1:2222`. The password-bearing `install.conf` has mode `0600`, is
 served on controller loopback, and is removed on exit. The forwarded SSH listener
-also binds to loopback.
+also binds to loopback. If `boot.exp` is interrupted, hung up, or fails, it
+powers the VM down through the QEMU monitor rather than killing it.
 
 The installer always previews its selected release, ISO checksum, disk, and QEMU
 commands before creating anything. `--dry-run` performs that preflight without
