@@ -16,7 +16,7 @@ jobs:
       - name: Set up controller tools
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.0
+          version: 2026.11.8
       - name: Install locked agent tooling
         run: bun install --frozen-lockfile
       - name: Validate the actual branch name
@@ -41,7 +41,7 @@ jobs:
       - name: Set up pinned uv
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
-          version: 2026.11.0
+          version: 2026.11.8
           install_args: uv
 
       - name: Install locked dependencies

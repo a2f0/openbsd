@@ -17,6 +17,10 @@ tools exactly, and `uv.lock` pins their transitive dependencies and hashes;
 preserve those exact pins and refresh `uv.lock` with the pinned uv version.
 
 Keep Bun and uv pinned in `.mise.toml`; CI installs those versions with mise.
+`mise.lock` is committed beside it; regenerate it with `mise lock` whenever
+`.mise.toml` changes. Every workflow's `jdx/mise-action` `version` must read the
+lockfile format (format 4 needs mise 2026.11.1+), so move those pins before the
+lockfile format changes.
 Keep `package.json`'s `packageManager` aligned with the Bun pin. Python packages
 remain managed by uv, and `.python-version` remains its interpreter selection.
 
