@@ -76,7 +76,8 @@ jobs:
       - name: Check logins, apply the baseline, and verify idempotence
         run: |
           cd "$RUNNER_TEMP/vm files"
-          "$GITHUB_WORKSPACE/boot.exp" --check-hardened
+          ln -s "$GITHUB_WORKSPACE/boot.exp" ./boot
+          ./boot --check-hardened
           "$GITHUB_WORKSPACE/boot.exp" --verify-hardened
         timeout-minutes: 20
         env:

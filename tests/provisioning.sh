@@ -8,9 +8,6 @@ work=$(mktemp -d)
 trap 'rm -r "$work"' 0
 trap 'exit 1' HUP INT TERM
 mkdir "$work/bin" "$work/run"
-ln -s "$repo/qemu.exp" "$work/bin/install"
-ln -s bin/install "$work/installer"
-ln -s "$repo/boot.exp" "$work/bin/boot"
 PROVISION_TEST_WORK=$work
 PROVISION_TEST_REPO=$repo
 export PROVISION_TEST_REPO PROVISION_TEST_WORK
@@ -50,6 +47,7 @@ cat > "$work/bin/uv" <<'UV'
 if [ "${PROVISION_TEST_INSTALL:-0}" -eq 1 ] &&
     [ "$1" = run ] && [ "$2" = --project ] && [ "$3" = "$PROVISION_TEST_REPO" ] &&
     [ "$4 $5 $6 $7 $8" = '--locked python -I -c import sys; print(sys.executable)' ]; then
+    echo "fixture interpreter warning" >&2
     echo "$PROVISION_TEST_WORK/server"
     exit 0
 fi
@@ -67,6 +65,9 @@ exec sleep 60
 SERVER
 chmod +x "$work/server"
 chmod +x "$work/bin/"*
+ln -s "$repo/qemu.exp" "$work/bin/install"
+ln -s bin/install "$work/installer"
+ln -s "$repo/boot.exp" "$work/bin/boot"
 PATH=$work/bin:$PATH
 export PATH
 USER_PASSWORD=fixture ROOT_PASSWORD=fixture

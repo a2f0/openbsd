@@ -191,7 +191,7 @@ while {[file type $script_path] eq "link"} {
 }
 set repo_dir [file dirname $script_path]
 set interpreter_query {import sys; print(sys.executable)}
-set python_bin [exec uv run --project $repo_dir --locked python -I -c $interpreter_query]
+set python_bin [exec uv run --project $repo_dir --locked python -I -c $interpreter_query 2>@stderr]
 set response_dir [exec mktemp -d]
 file attributes $response_dir -permissions 0700
 spawn -noecho $python_bin -I -u -m http.server 8686 --bind 127.0.0.1 --directory $response_dir
