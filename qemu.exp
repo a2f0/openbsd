@@ -184,7 +184,12 @@ exit -onexit cleanup
 trap {exit 1} {SIGHUP SIGINT SIGTERM}
 
 puts "Starting Python web server on port 8686..."
-set repo_dir [file dirname [file normalize [info script]]]
+set script_path [file normalize [info script]]
+while {[file type $script_path] eq "link"} {
+    set target [file readlink $script_path]
+    set script_path [file normalize [file join [file dirname $script_path] $target]]
+}
+set repo_dir [file dirname $script_path]
 set interpreter_query {import sys; print(sys.executable)}
 set python_bin [exec uv run --project $repo_dir --locked python -I -c $interpreter_query]
 set response_dir [exec mktemp -d]

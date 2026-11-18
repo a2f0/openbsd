@@ -179,7 +179,12 @@ if {$CHECK} {
     puts "\nssh login as a2f0 succeeded: $ssh_out"
 
     if {$HARDEN} {
-        set repo_dir [file dirname [file normalize [info script]]]
+        set script_path [file normalize [info script]]
+        while {[file type $script_path] eq "link"} {
+            set target [file readlink $script_path]
+            set script_path [file normalize [file join [file dirname $script_path] $target]]
+        }
+        set repo_dir [file dirname $script_path]
         set archive_file [exec mktemp]
         if {
             [catch {

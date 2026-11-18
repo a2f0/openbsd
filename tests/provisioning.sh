@@ -8,6 +8,9 @@ work=$(mktemp -d)
 trap 'rm -r "$work"' 0
 trap 'exit 1' HUP INT TERM
 mkdir "$work/bin" "$work/run"
+ln -s "$repo/qemu.exp" "$work/bin/install"
+ln -s bin/install "$work/installer"
+ln -s "$repo/boot.exp" "$work/bin/boot"
 PROVISION_TEST_WORK=$work
 PROVISION_TEST_REPO=$repo
 export PROVISION_TEST_REPO PROVISION_TEST_WORK
@@ -220,7 +223,7 @@ VM
 chmod +x "$work/disk/"*
 printf 'cached iso\n' > install80.iso
 install() {
-    PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1
+    PATH=$work/disk:$PATH "$EXPECT" "$work/installer" > "$work/result" 2>&1
 }
 response_removed() {
     [ ! -e "$(cat "$work/response-dir")" ]
@@ -245,7 +248,7 @@ unset PROVISION_TEST_VM_SYNC
 # Hanging up mid-installation must discard the disk as well.
 rm -f "$work/installer.pid"
 # Background Expect itself, not a subshell, so the signal reaches it.
-PROVISION_TEST_VM_BLOCK=1 PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1 &
+PROVISION_TEST_VM_BLOCK=1 PATH=$work/disk:$PATH "$EXPECT" "$work/installer" > "$work/result" 2>&1 &
 installer=$!
 tries=0
 until [ -s "$work/installer.pid" ] && grep -q 'Response file location' "$work/result"; do
@@ -297,7 +300,7 @@ exit 1
 VM
 chmod +x "$work/vm/qemu-system-x86_64"
 printf 'disk\n' > openbsd-vm.qcow2
-PATH=$work/vm:$PATH "$EXPECT" "$repo/boot.exp" > "$work/result" 2>&1 &
+PATH=$work/vm:$PATH "$EXPECT" "$work/bin/boot" > "$work/result" 2>&1 &
 booter=$!
 tries=0
 until [ -s "$work/vm.pid" ]; do

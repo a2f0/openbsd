@@ -1,9 +1,11 @@
 # VM provisioning and verification
 
 After [controller setup](../README.md#quick-start), run the installer and boot
-commands from the directory that should hold the ISO and VM disk. The examples use the checkout as that directory. From another
-directory, invoke the scripts by path. They find the locked Python project and
-the baseline to transfer beside the scripts.
+commands from the directory that should hold the ISO and VM disk. The examples
+use the checkout. To run from elsewhere with mise, run
+`export PATH="$(dirname "$(mise which uv)"):$PATH"` in the checkout before
+changing directory. Invoke the scripts by path. They find the locked Python
+project and the baseline to transfer beside the scripts.
 
 Install Expect, QEMU, wget, and GNU coreutils on the controller (Ubuntu:
 `sudo apt-get install expect qemu-system-x86 wget coreutils`; macOS:
