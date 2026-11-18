@@ -1,7 +1,11 @@
 # VM provisioning and verification
 
-Run the commands below from the repository root after completing
-[controller setup](../README.md#quick-start).
+After [controller setup](../README.md#quick-start), run the installer and boot
+commands from the directory that should hold the ISO and VM disk. The examples
+use the checkout. To run from elsewhere with mise, run
+`export PATH="$(dirname "$(mise which uv)"):$PATH"` in the checkout before
+changing directory. Invoke the scripts by path. They find the locked Python
+project and the baseline to transfer beside the scripts.
 
 Install Expect, QEMU, wget, and GNU coreutils on the controller (Ubuntu:
 `sudo apt-get install expect qemu-system-x86 wget coreutils`; macOS:
@@ -20,7 +24,7 @@ Set `USER_PASSWORD` and `ROOT_PASSWORD`, then run:
 Set `SSH_PUBLIC_KEY` before installation to authorize your own key for `a2f0`;
 otherwise the existing default public key is used. SSH is forwarded at
 `a2f0@127.0.0.1:2222`. The password-bearing `install.conf` has mode `0600`, is
-served on controller loopback, and is removed on exit. The forwarded SSH listener
+served from a private temporary directory on controller loopback, and is removed on exit. The forwarded SSH listener
 also binds to loopback. If `boot.exp` is interrupted, hung up, or fails, it
 powers the VM down through the QEMU monitor rather than killing it.
 

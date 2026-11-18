@@ -2,14 +2,15 @@
 # Preview, ISO download, and installation failure regression coverage: no
 # network, real disk, or virtual machine.
 set -eu
-repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 EXPECT=$(command -v expect)
 work=$(mktemp -d)
 trap 'rm -r "$work"' 0
 trap 'exit 1' HUP INT TERM
 mkdir "$work/bin" "$work/run"
 PROVISION_TEST_WORK=$work
-export PROVISION_TEST_WORK
+PROVISION_TEST_REPO=$repo
+export PROVISION_TEST_REPO PROVISION_TEST_WORK
 cat > "$work/bin/wget" <<'WGET'
 #!/bin/sh
 set -eu
@@ -44,7 +45,9 @@ cp "$work/bin/qemu-img" "$work/bin/qemu-system-x86_64"
 cat > "$work/bin/uv" <<'UV'
 #!/bin/sh
 if [ "${PROVISION_TEST_INSTALL:-0}" -eq 1 ] &&
-    [ "$*" = 'run --locked python -c import sys; print(sys.executable)' ]; then
+    [ "$1" = run ] && [ "$2" = --project ] && [ "$3" = "$PROVISION_TEST_REPO" ] &&
+    [ "$4 $5 $6 $7 $8" = '--locked python -I -c import sys; print(sys.executable)' ]; then
+    echo "fixture interpreter warning" >&2
     echo "$PROVISION_TEST_WORK/server"
     exit 0
 fi
@@ -53,11 +56,18 @@ exit 91
 UV
 cat > "$work/server" <<'SERVER'
 #!/bin/sh
+set -eu
+[ "$1 $2 $3 $4 $5 $6 $7 $8" = '-I -u -m http.server 8686 --bind 127.0.0.1 --directory' ]
+[ -d "$9" ] && [ -z "$(ls -A "$9")" ]
+printf '%s\n' "$9" > "$PROVISION_TEST_WORK/response-dir"
 echo 'Serving HTTP on 127.0.0.1 port 8686'
 exec sleep 60
 SERVER
 chmod +x "$work/server"
 chmod +x "$work/bin/"*
+ln -s "$repo/qemu.exp" "$work/bin/install"
+ln -s bin/install "$work/installer"
+ln -s "$repo/boot.exp" "$work/bin/boot"
 PATH=$work/bin:$PATH
 export PATH
 USER_PASSWORD=fixture ROOT_PASSWORD=fixture
@@ -181,7 +191,10 @@ for argument do
     case "$argument" in file=*,format=qcow2,*) disk=${argument#file=}; disk=${disk%%,*} ;; esac
 done
 [ -n "$disk" ] && [ "$(cat "$disk")" = blank ] || exit 90
-[ -f install.conf ] || exit 90
+response_dir=$(cat "$PROVISION_TEST_WORK/response-dir")
+[ "$(ls -A "$response_dir")" = install.conf ] || exit 90
+[ "$(find "$response_dir" -prune -type d -perm 0700)" = "$response_dir" ] || exit 90
+[ "$(find "$response_dir/install.conf" -type f -perm 0600)" = "$response_dir/install.conf" ] || exit 90
 echo "$$" > "$PROVISION_TEST_WORK/installer.pid"
 [ "${PROVISION_TEST_VM_FAIL:-0}" -eq 0 ] || exit 1
 printf 'boot> '; read -r line
@@ -211,10 +224,15 @@ VM
 chmod +x "$work/disk/"*
 printf 'cached iso\n' > install80.iso
 install() {
-    PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1
+    PATH=$work/disk:$PATH "$EXPECT" "$work/installer" > "$work/result" 2>&1
+}
+response_removed() {
+    [ ! -e "$(cat "$work/response-dir")" ]
 }
 install_rejected() {
+    : > "$work/response-dir"
     if install; then cat "$work/result"; echo 'Failed installation succeeded' >&2; exit 1; fi
+    [ -s "$work/response-dir" ] && response_removed || exit 1
     grep -Fq "$1" "$work/result" || { cat "$work/result"; exit 1; }
     [ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
 }
@@ -231,7 +249,7 @@ unset PROVISION_TEST_VM_SYNC
 # Hanging up mid-installation must discard the disk as well.
 rm -f "$work/installer.pid"
 # Background Expect itself, not a subshell, so the signal reaches it.
-PROVISION_TEST_VM_BLOCK=1 PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1 &
+PROVISION_TEST_VM_BLOCK=1 PATH=$work/disk:$PATH "$EXPECT" "$work/installer" > "$work/result" 2>&1 &
 installer=$!
 tries=0
 until [ -s "$work/installer.pid" ] && grep -q 'Response file location' "$work/result"; do
@@ -242,9 +260,11 @@ done
 sleep 0.2
 kill -HUP "$installer"
 if wait "$installer"; then echo 'Hung-up installation exited successfully' >&2; exit 1; fi
+response_removed
 kill "$(cat "$work/installer.pid")" 2> /dev/null || :
 [ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
 install || { cat "$work/result"; exit 1; }
+response_removed
 [ "$(cat openbsd-vm.qcow2)" = installed ] || { cat "$work/result"; ls -A; exit 1; }
 [ "$(ls -A)" = 'install80.iso
 openbsd-vm.qcow2' ] || { ls -A; exit 1; }
@@ -281,7 +301,7 @@ exit 1
 VM
 chmod +x "$work/vm/qemu-system-x86_64"
 printf 'disk\n' > openbsd-vm.qcow2
-PATH=$work/vm:$PATH "$EXPECT" "$repo/boot.exp" > "$work/result" 2>&1 &
+PATH=$work/vm:$PATH "$EXPECT" "$work/bin/boot" > "$work/result" 2>&1 &
 booter=$!
 tries=0
 until [ -s "$work/vm.pid" ]; do

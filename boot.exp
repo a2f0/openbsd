@@ -179,10 +179,16 @@ if {$CHECK} {
     puts "\nssh login as a2f0 succeeded: $ssh_out"
 
     if {$HARDEN} {
+        set script_path [file normalize [info script]]
+        while {[file type $script_path] eq "link"} {
+            set target [file readlink $script_path]
+            set script_path [file normalize [file join [file dirname $script_path] $target]]
+        }
+        set repo_dir [file dirname $script_path]
         set archive_file [exec mktemp]
         if {
             [catch {
-                exec tar -cf $archive_file baseline tests
+                exec tar -cf $archive_file -C $repo_dir baseline tests
                 exec {*}$ssh_cmd tar -xpf - -C /home/a2f0 < $archive_file 2>@1
             } transfer_out]
         } {

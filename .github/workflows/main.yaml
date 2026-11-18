@@ -63,8 +63,10 @@ jobs:
 
       - name: Run QEMU OpenBSD installation
         run: |
-          ./qemu.exp --dry-run
-          ./qemu.exp
+          mkdir "$RUNNER_TEMP/vm files"
+          cd "$RUNNER_TEMP/vm files"
+          "$GITHUB_WORKSPACE/qemu.exp" --dry-run
+          "$GITHUB_WORKSPACE/qemu.exp"
         timeout-minutes: 30
         env:
           USER_PASSWORD: CICD
@@ -73,8 +75,10 @@ jobs:
 
       - name: Check logins, apply the baseline, and verify idempotence
         run: |
-          ./boot.exp --check-hardened
-          ./boot.exp --verify-hardened
+          cd "$RUNNER_TEMP/vm files"
+          ln -s "$GITHUB_WORKSPACE/boot.exp" ./boot
+          ./boot --check-hardened
+          "$GITHUB_WORKSPACE/boot.exp" --verify-hardened
         timeout-minutes: 20
         env:
           USER_PASSWORD: CICD
