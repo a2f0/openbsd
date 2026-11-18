@@ -145,6 +145,7 @@ Set name(s) = -game* -x* -comp*"
 
     # Write the content to install.conf
     set file [open [file join $::response_dir install.conf] {WRONLY CREAT EXCL} 0600]
+    file attributes [file join $::response_dir install.conf] -permissions 0600
     puts $file $conf_content
     close $file
 
@@ -187,6 +188,7 @@ set repo_dir [file dirname [file normalize [info script]]]
 set interpreter_query {import sys; print(sys.executable)}
 set python_bin [exec uv run --project $repo_dir --locked python -I -c $interpreter_query]
 set response_dir [exec mktemp -d]
+file attributes $response_dir -permissions 0700
 spawn -noecho $python_bin -I -u -m http.server 8686 --bind 127.0.0.1 --directory $response_dir
 set WEB_SERVER_PID [exp_pid]
 set WEB_SERVER_SPAWN_ID $spawn_id

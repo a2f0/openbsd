@@ -189,7 +189,8 @@ done
 [ -n "$disk" ] && [ "$(cat "$disk")" = blank ] || exit 90
 response_dir=$(cat "$PROVISION_TEST_WORK/response-dir")
 [ "$(ls -A "$response_dir")" = install.conf ] || exit 90
-[ -f "$response_dir/install.conf" ] || exit 90
+[ "$(find "$response_dir" -prune -type d -perm 0700)" = "$response_dir" ] || exit 90
+[ "$(find "$response_dir/install.conf" -type f -perm 0600)" = "$response_dir/install.conf" ] || exit 90
 echo "$$" > "$PROVISION_TEST_WORK/installer.pid"
 [ "${PROVISION_TEST_VM_FAIL:-0}" -eq 0 ] || exit 1
 printf 'boot> '; read -r line
@@ -221,8 +222,13 @@ printf 'cached iso\n' > install80.iso
 install() {
     PATH=$work/disk:$PATH "$EXPECT" "$repo/qemu.exp" > "$work/result" 2>&1
 }
+response_removed() {
+    [ ! -e "$(cat "$work/response-dir")" ]
+}
 install_rejected() {
+    : > "$work/response-dir"
     if install; then cat "$work/result"; echo 'Failed installation succeeded' >&2; exit 1; fi
+    [ -s "$work/response-dir" ] && response_removed || exit 1
     grep -Fq "$1" "$work/result" || { cat "$work/result"; exit 1; }
     [ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
 }
@@ -250,9 +256,11 @@ done
 sleep 0.2
 kill -HUP "$installer"
 if wait "$installer"; then echo 'Hung-up installation exited successfully' >&2; exit 1; fi
+response_removed
 kill "$(cat "$work/installer.pid")" 2> /dev/null || :
 [ "$(ls -A)" = install80.iso ] || { cat "$work/result"; ls -A; exit 1; }
 install || { cat "$work/result"; exit 1; }
+response_removed
 [ "$(cat openbsd-vm.qcow2)" = installed ] || { cat "$work/result"; ls -A; exit 1; }
 [ "$(ls -A)" = 'install80.iso
 openbsd-vm.qcow2' ] || { ls -A; exit 1; }
