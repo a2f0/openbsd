@@ -1,6 +1,6 @@
 #!/usr/bin/expect -f
 
-set INSTALL_CONF_CREATED 0
+set response_dir ""
 set DRY_RUN 0
 if {$argc == 1 && [lindex $argv 0] eq "--dry-run"} {
     set DRY_RUN 1
@@ -144,9 +144,7 @@ Continue without verification? = yes
 Set name(s) = -game* -x* -comp*"
 
     # Write the content to install.conf
-    set file [open "install.conf" {WRONLY CREAT EXCL} 0600]
-    set ::INSTALL_CONF_CREATED 1
-    file attributes "install.conf" -permissions 0600
+    set file [open [file join $::response_dir install.conf] {WRONLY CREAT EXCL} 0600]
     puts $file $conf_content
     close $file
 
@@ -159,7 +157,7 @@ set ISO_DOWNLOAD_FILE ""
 set DISK_CREATE_FILE ""
 
 proc cleanup {} {
-    global WEB_SERVER_PID WEB_SERVER_SPAWN_ID INSTALL_CONF_CREATED ISO_DOWNLOAD_FILE
+    global WEB_SERVER_PID WEB_SERVER_SPAWN_ID response_dir ISO_DOWNLOAD_FILE
     global DISK_CREATE_FILE
     puts "Cleaning up..."
     if {$WEB_SERVER_PID != ""} {
@@ -168,8 +166,8 @@ proc cleanup {} {
         catch {close -i $WEB_SERVER_SPAWN_ID}
         catch {wait -i $WEB_SERVER_SPAWN_ID}
     }
-    if {$INSTALL_CONF_CREATED} {
-        file delete -force "install.conf"
+    if {$response_dir ne ""} {
+        file delete -force $response_dir
     }
     if {$ISO_DOWNLOAD_FILE ne ""} {
         file delete -force $ISO_DOWNLOAD_FILE
@@ -187,8 +185,9 @@ trap {exit 1} {SIGHUP SIGINT SIGTERM}
 puts "Starting Python web server on port 8686..."
 set repo_dir [file dirname [file normalize [info script]]]
 set interpreter_query {import sys; print(sys.executable)}
-set python_executable [exec uv run --project $repo_dir --locked python -c $interpreter_query]
-spawn -noecho $python_executable -u -m http.server 8686 --bind 127.0.0.1
+set python_bin [exec uv run --project $repo_dir --locked python -I -c $interpreter_query]
+set response_dir [exec mktemp -d]
+spawn -noecho $python_bin -I -u -m http.server 8686 --bind 127.0.0.1 --directory $response_dir
 set WEB_SERVER_PID [exp_pid]
 set WEB_SERVER_SPAWN_ID $spawn_id
 

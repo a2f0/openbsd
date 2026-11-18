@@ -1,8 +1,7 @@
 # VM provisioning and verification
 
 After [controller setup](../README.md#quick-start), run the installer and boot
-commands from the directory that should hold the ISO, install response file,
-and VM disk. The examples use the checkout as that directory. From another
+commands from the directory that should hold the ISO and VM disk. The examples use the checkout as that directory. From another
 directory, invoke the scripts by path. They find the locked Python project and
 the baseline to transfer beside the scripts.
 
@@ -23,7 +22,7 @@ Set `USER_PASSWORD` and `ROOT_PASSWORD`, then run:
 Set `SSH_PUBLIC_KEY` before installation to authorize your own key for `a2f0`;
 otherwise the existing default public key is used. SSH is forwarded at
 `a2f0@127.0.0.1:2222`. The password-bearing `install.conf` has mode `0600`, is
-served on controller loopback, and is removed on exit. The forwarded SSH listener
+served from a private temporary directory on controller loopback, and is removed on exit. The forwarded SSH listener
 also binds to loopback. If `boot.exp` is interrupted, hung up, or fails, it
 powers the VM down through the QEMU monitor rather than killing it.
 

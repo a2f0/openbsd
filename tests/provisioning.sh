@@ -2,7 +2,7 @@
 # Preview, ISO download, and installation failure regression coverage: no
 # network, real disk, or virtual machine.
 set -eu
-repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 EXPECT=$(command -v expect)
 work=$(mktemp -d)
 trap 'rm -r "$work"' 0
@@ -46,7 +46,7 @@ cat > "$work/bin/uv" <<'UV'
 #!/bin/sh
 if [ "${PROVISION_TEST_INSTALL:-0}" -eq 1 ] &&
     [ "$1" = run ] && [ "$2" = --project ] && [ "$3" = "$PROVISION_TEST_REPO" ] &&
-    [ "$4 $5 $6 $7" = '--locked python -c import sys; print(sys.executable)' ]; then
+    [ "$4 $5 $6 $7 $8" = '--locked python -I -c import sys; print(sys.executable)' ]; then
     echo "$PROVISION_TEST_WORK/server"
     exit 0
 fi
@@ -55,6 +55,10 @@ exit 91
 UV
 cat > "$work/server" <<'SERVER'
 #!/bin/sh
+set -eu
+[ "$1 $2 $3 $4 $5 $6 $7 $8" = '-I -u -m http.server 8686 --bind 127.0.0.1 --directory' ]
+[ -d "$9" ] && [ -z "$(ls -A "$9")" ]
+printf '%s\n' "$9" > "$PROVISION_TEST_WORK/response-dir"
 echo 'Serving HTTP on 127.0.0.1 port 8686'
 exec sleep 60
 SERVER
@@ -183,7 +187,9 @@ for argument do
     case "$argument" in file=*,format=qcow2,*) disk=${argument#file=}; disk=${disk%%,*} ;; esac
 done
 [ -n "$disk" ] && [ "$(cat "$disk")" = blank ] || exit 90
-[ -f install.conf ] || exit 90
+response_dir=$(cat "$PROVISION_TEST_WORK/response-dir")
+[ "$(ls -A "$response_dir")" = install.conf ] || exit 90
+[ -f "$response_dir/install.conf" ] || exit 90
 echo "$$" > "$PROVISION_TEST_WORK/installer.pid"
 [ "${PROVISION_TEST_VM_FAIL:-0}" -eq 0 ] || exit 1
 printf 'boot> '; read -r line
