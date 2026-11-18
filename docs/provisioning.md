@@ -1,7 +1,10 @@
 # VM provisioning and verification
 
-Run the commands below from the repository root after completing
-[controller setup](../README.md#quick-start).
+After [controller setup](../README.md#quick-start), run the installer and boot
+commands from the directory that should hold the ISO, install response file,
+and VM disk. The examples use the checkout as that directory. From another
+directory, invoke the scripts by path. They find the locked Python project and
+the baseline to transfer beside the scripts.
 
 Install Expect, QEMU, wget, and GNU coreutils on the controller (Ubuntu:
 `sudo apt-get install expect qemu-system-x86 wget coreutils`; macOS:

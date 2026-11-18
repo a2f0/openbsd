@@ -9,7 +9,8 @@ trap 'rm -r "$work"' 0
 trap 'exit 1' HUP INT TERM
 mkdir "$work/bin" "$work/run"
 PROVISION_TEST_WORK=$work
-export PROVISION_TEST_WORK
+PROVISION_TEST_REPO=$repo
+export PROVISION_TEST_REPO PROVISION_TEST_WORK
 cat > "$work/bin/wget" <<'WGET'
 #!/bin/sh
 set -eu
@@ -44,7 +45,8 @@ cp "$work/bin/qemu-img" "$work/bin/qemu-system-x86_64"
 cat > "$work/bin/uv" <<'UV'
 #!/bin/sh
 if [ "${PROVISION_TEST_INSTALL:-0}" -eq 1 ] &&
-    [ "$*" = 'run --locked python -c import sys; print(sys.executable)' ]; then
+    [ "$1" = run ] && [ "$2" = --project ] && [ "$3" = "$PROVISION_TEST_REPO" ] &&
+    [ "$4 $5 $6 $7" = '--locked python -c import sys; print(sys.executable)' ]; then
     echo "$PROVISION_TEST_WORK/server"
     exit 0
 fi
