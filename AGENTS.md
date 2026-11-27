@@ -73,7 +73,8 @@ it or the `permissions` section of `agent-tool.json`, run `bun run agents:sync`,
 which installs the managed skills and then the generated harness permission
 rules, and commit the lockfile, `.agent-tool-skills.json`, the generated skills
 under `.agents/skills` and `.claude/skills`, `.agent-tool-permissions.json`,
-`.claude/settings.json`, and `.codex/rules/agent-tool.rules` together. Do not
+`.claude/settings.json`, `.codex/rules/agent-tool.rules`, and
+`.gemini/policies/agent-tool.toml` together. Do not
 edit managed skills or generated rules. Keep repository guidance here; do not
 add CLAUDE.md. The existing CI `lint` job runs `bun run agents:check` to detect
 skill and permission drift. `agent-tool.json` classifies no executables:
